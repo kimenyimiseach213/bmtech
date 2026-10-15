@@ -1,0 +1,139 @@
+import { NextRequest } from "next/server";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const SESSION_COOKIE = "bmtech_admin_session";
+const TOKEN_COOKIE = "bmtech_admin_token";
+
+function cookieOptions(name: string, value: string, maxAge?: number) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  const age = maxAge === undefined ? "" : `; Max-Age=${maxAge}`;
+  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax${secure}${age}`;
+}
+
+function readCookie(header: string, name: string) {
+  const pair = header.split(";").map((item) => item.trim()).find((item) => item.startsWith(`${name}=`));
+  return pair ? decodeURIComponent(pair.slice(name.length + 1)) : "";
+}
+
+function cleanBackendCookie(value: string) {
+  let cookie = value
+    .replace(/;\s*Domain=[^;]*/ig, "")
+    .replace(/;\s*Path=[^;]*/ig, "; Path=/");
+  if (!/;\s*Path=/i.test(cookie)) cookie += "; Path=/";
+  if (!/;\s*HttpOnly/i.test(cookie)) cookie += "; HttpOnly";
+  if (!/;\s*SameSite=/i.test(cookie)) cookie += "; SameSite=Lax";
+  if (process.env.NODE_ENV === "production" && !/;\s*Secure/i.test(cookie)) cookie += "; Secure";
+  return cookie;
+}
+
+function extractAccessToken(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const row = payload as Record<string, unknown>;
+  const nested = row.data && typeof row.data === "object" ? row.data as Record<string, unknown> : {};
+  const candidate = row.accessToken ?? row.access_token ?? row.token ?? nested.accessToken ?? nested.access_token ?? nested.token;
+  return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
+}
+
+function removeTokens(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(removeTokens);
+  if (!value || typeof value !== "object") return value;
+  const filtered: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (["accessToken", "access_token", "refreshToken", "refresh_token", "token"].includes(key)) continue;
+    filtered[key] = removeTokens(child);
+  }
+  return filtered;
+}
+
+async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const baseUrl = process.env.BMTECH_API_BASE_URL;
+  if (!baseUrl) return Response.json({ message: "BMTECH_API_BASE_URL is not configured." }, { status: 503 });
+
+  const { path } = await context.params;
+  if (!path.length || path.some((part) => part === "." || part === ".." || part.includes("\\") || part.includes("/"))) {
+    return Response.json({ message: "Invalid API path." }, { status: 400 });
+  }
+  const pathValue = path.map((part) => encodeURIComponent(part)).join("/");
+  if (!pathValue.startsWith("api/v1/")) return Response.json({ message: "Only /api/v1 endpoints are available." }, { status: 404 });
+
+  let upstreamUrl: URL;
+  try {
+    upstreamUrl = new URL(`${pathValue}${request.nextUrl.search}`, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+    if (!["http:", "https:"].includes(upstreamUrl.protocol)) throw new Error("Unsupported protocol");
+  } catch {
+    return Response.json({ message: "BMTECH_API_BASE_URL must be a valid HTTP(S) URL." }, { status: 500 });
+  }
+
+  const incomingCookie = request.headers.get("cookie") ?? "";
+  const isLogin = pathValue === "api/v1/admin/auth/login";
+  const isLogout = pathValue === "api/v1/admin/auth/logout";
+  if (pathValue.startsWith("api/v1/admin/") && !isLogin && !isLogout && !readCookie(incomingCookie, SESSION_COOKIE)) {
+    return Response.json({ message: "Administrator authentication is required." }, { status: 401 });
+  }
+  const accessToken = readCookie(incomingCookie, TOKEN_COOKIE);
+  const forwardedCookies = incomingCookie.split(";").map((entry) => entry.trim())
+    .filter((entry) => entry && !entry.startsWith(`${SESSION_COOKIE}=`) && !entry.startsWith(`${TOKEN_COOKIE}=`))
+    .join("; ");
+  const headers = new Headers();
+  for (const header of ["accept", "content-type", "if-none-match", "if-modified-since"]) {
+    const value = request.headers.get(header);
+    if (value) headers.set(header, value);
+  }
+  if (forwardedCookies) headers.set("cookie", forwardedCookies);
+  if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
+
+  let upstream: Response;
+  try {
+    const hasBody = !["GET", "HEAD"].includes(request.method);
+    upstream = await fetch(upstreamUrl, {
+      method: request.method,
+      headers,
+      body: hasBody ? await request.arrayBuffer() : undefined,
+      cache: "no-store",
+      redirect: "manual",
+    });
+  } catch {
+    return Response.json({ message: "The BMTECH API is unavailable." }, { status: 502 });
+  }
+
+  const responseHeaders = new Headers({
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+  });
+  for (const header of ["content-type", "content-disposition", "etag", "last-modified"]) {
+    const value = upstream.headers.get(header);
+    if (value) responseHeaders.set(header, value);
+  }
+
+  const getSetCookie = (upstream.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+  const backendCookies = getSetCookie ? getSetCookie.call(upstream.headers) : (upstream.headers.get("set-cookie") ? [upstream.headers.get("set-cookie")!] : []);
+  for (const cookie of backendCookies) responseHeaders.append("set-cookie", cleanBackendCookie(cookie));
+
+  let accessTokenFromBody: string | null = null;
+  let responseBody: BodyInit | null = upstream.body;
+  if (isLogin && upstream.ok) {
+    try { accessTokenFromBody = extractAccessToken(await upstream.clone().json()); } catch { /* Cookie-based auth response. */ }
+    responseHeaders.append("set-cookie", cookieOptions(SESSION_COOKIE, "1", 60 * 60 * 12));
+    if (accessTokenFromBody) responseHeaders.append("set-cookie", cookieOptions(TOKEN_COOKIE, accessTokenFromBody, 60 * 60 * 12));
+    if (accessTokenFromBody) {
+      try {
+        responseBody = JSON.stringify(removeTokens(await upstream.clone().json()));
+        responseHeaders.set("content-type", "application/json; charset=utf-8");
+      } catch { /* Keep a non-JSON login response unchanged. */ }
+    }
+  }
+  if (isLogout || (pathValue.startsWith("api/v1/admin/") && upstream.status === 401)) {
+    responseHeaders.append("set-cookie", cookieOptions(SESSION_COOKIE, "", 0));
+    responseHeaders.append("set-cookie", cookieOptions(TOKEN_COOKIE, "", 0));
+  }
+
+  return new Response(responseBody, { status: upstream.status, headers: responseHeaders });
+}
+
+export const GET = proxy;
+export const POST = proxy;
+export const PUT = proxy;
+export const PATCH = proxy;
+export const DELETE = proxy;
