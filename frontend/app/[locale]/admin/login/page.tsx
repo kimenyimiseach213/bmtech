@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Zap } from "lucide-react";
-import { apiPaths, apiRequest } from "@/lib/api";
+import { apiPaths, apiRequest, loginErrorMessage } from "@/lib/api";
 
 export default function AdminLoginPage() {
   const params = useParams<{ locale: string }>();
@@ -27,7 +27,7 @@ export default function AdminLoginPage() {
       router.replace(safeNext);
       router.refresh();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : (french ? "Connexion impossible." : "Unable to sign in."));
+      setError(loginErrorMessage(reason));
     } finally {
       setLoading(false);
     }

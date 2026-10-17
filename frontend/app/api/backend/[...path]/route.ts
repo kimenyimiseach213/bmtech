@@ -48,8 +48,18 @@ function removeTokens(value: unknown): unknown {
 }
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
-  const baseUrl = process.env.BMTECH_API_BASE_URL;
+  const baseUrl = process.env.BMTECH_API_BASE_URL?.trim();
   if (!baseUrl) return Response.json({ message: "BMTECH_API_BASE_URL is not configured." }, { status: 503 });
+
+  let backendOrigin: URL;
+  try {
+    backendOrigin = new URL(baseUrl);
+    if (!["http:", "https:"].includes(backendOrigin.protocol) || backendOrigin.username || backendOrigin.password) throw new Error("Invalid API origin");
+    if (backendOrigin.pathname !== "/" || backendOrigin.search || backendOrigin.hash) throw new Error("API base must be an origin without /api/v1");
+  } catch {
+    console.error("[BMTECH API proxy] BMTECH_API_BASE_URL must be an HTTP(S) origin without a path, query, credentials, or fragment.");
+    return Response.json({ message: "The server is temporarily unavailable. Please try again." }, { status: 503 });
+  }
 
   const { path } = await context.params;
   if (!path.length || path.some((part) => part === "." || part === ".." || part.includes("\\") || part.includes("/"))) {
@@ -60,7 +70,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   let upstreamUrl: URL;
   try {
-    upstreamUrl = new URL(`${pathValue}${request.nextUrl.search}`, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+    upstreamUrl = new URL(`${pathValue}${request.nextUrl.search}`, backendOrigin.href.endsWith("/") ? backendOrigin : `${backendOrigin.href}/`);
     if (!["http:", "https:"].includes(upstreamUrl.protocol)) throw new Error("Unsupported protocol");
   } catch {
     return Response.json({ message: "BMTECH_API_BASE_URL must be a valid HTTP(S) URL." }, { status: 500 });
@@ -94,8 +104,16 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       cache: "no-store",
       redirect: "manual",
     });
-  } catch {
-    return Response.json({ message: "The BMTECH API is unavailable." }, { status: 502 });
+  } catch (error) {
+    // Log only a safe transport code and hostname, never request bodies, tokens,
+    // full URLs, or raw exceptions (which can include credentials).
+    const cause = error instanceof Error ? error.cause : undefined;
+    const code = cause && typeof cause === "object" && "code" in cause ? cause.code : undefined;
+    console.error("[BMTECH API proxy] Upstream connection failed", {
+      host: backendOrigin.hostname,
+      code: typeof code === "string" && /^[A-Z0-9_]{1,40}$/.test(code) ? code : "UNKNOWN",
+    });
+    return Response.json({ message: "The server is temporarily unavailable. Please try again." }, { status: 502 });
   }
 
   const responseHeaders = new Headers({
@@ -114,7 +132,13 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   let accessTokenFromBody: string | null = null;
   let responseBody: BodyInit | null = upstream.body;
   if (isLogin && upstream.ok) {
-    try { accessTokenFromBody = extractAccessToken(await upstream.clone().json()); } catch { /* Cookie-based auth response. */ }
+    try { accessTokenFromBody = extractAccessToken(await upstream.clone().json()); } catch { /* Invalid authentication response. */ }
+    // NestJS login must return a JWT. An HTML page or empty 2xx response from
+    // a misconfigured upstream must never establish an administrator session.
+    if (!accessTokenFromBody) {
+      console.error("[BMTECH API proxy] Login response did not contain an access token.");
+      return Response.json({ message: "An unexpected server error occurred." }, { status: 502 });
+    }
     responseHeaders.append("set-cookie", cookieOptions(SESSION_COOKIE, "1", 60 * 60 * 12));
     if (accessTokenFromBody) responseHeaders.append("set-cookie", cookieOptions(TOKEN_COOKIE, accessTokenFromBody, 60 * 60 * 12));
     if (accessTokenFromBody) {

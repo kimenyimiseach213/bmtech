@@ -12,6 +12,15 @@ export class ApiError extends Error {
   }
 }
 
+export function loginErrorMessage(reason: unknown): string {
+  if (reason instanceof ApiError) {
+    if (reason.status === 401 || reason.status === 403) return "Incorrect email or password.";
+    if (reason.status === 0) return "Unable to connect to the server.";
+    if ([502, 503, 504].includes(reason.status)) return "The server is temporarily unavailable. Please try again.";
+  }
+  return "An unexpected server error occurred.";
+}
+
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const cleanPath = path.replace(/^\/+/, "");
   const headers = new Headers(init.headers);
@@ -20,6 +29,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   }
   headers.set("Accept", "application/json");
   let response: Response;
+  let text: string;
   try {
     response = await fetch(`/api/backend/${cleanPath}`, {
       ...init,
@@ -27,11 +37,11 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
       credentials: "include",
       cache: "no-store",
     });
+    text = await response.text();
   } catch {
-    throw new ApiError("The BMTECH API could not be reached. Check the API URL and network connection.", 0);
+    throw new ApiError("Unable to connect to the server.", 0);
   }
 
-  const text = await response.text();
   let data: unknown = null;
   if (text) {
     try { data = JSON.parse(text) as unknown; }
