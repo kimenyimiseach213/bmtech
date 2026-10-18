@@ -4,7 +4,8 @@ export const phoneDisplay = "0788494513";
 export const whatsappNumber = "250788494513";
 
 export const imageUrls = {
-  generator: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1400&q=85",
+  logo: "/images/branding/bmtech-logo.png",
+  generator: "/images/branding/bmtech-hero.png",
   engineer: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&q=85",
   technician: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=1200&q=85",
   panel: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=1000&q=85",

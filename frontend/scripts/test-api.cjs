@@ -21,6 +21,7 @@ function loadTypeScript(relative) {
 const api = loadTypeScript('lib/api.ts');
 const proxy = loadTypeScript('app/api/backend/[...path]/route.ts');
 const middleware = loadTypeScript('middleware.ts').middleware;
+const accountValidation = loadTypeScript('lib/account-security.ts');
 const { NextRequest } = require('next/server');
 const originalFetch = global.fetch;
 const originalBase = process.env.BMTECH_API_BASE_URL;
@@ -173,3 +174,56 @@ test('dashboard and admin API remain protected without a session', async () => {
   assert.equal(response.status, 307);
   assert.match(response.headers.get('location'), /\/en\/admin\/login\?next=/);
 });
+<<<<<<< HEAD
+=======
+
+test('account mutations reject cross-origin requests before forwarding credentials', async () => {
+  global.fetch = async () => assert.fail('must not forward cross-origin account changes');
+  for (const endpoint of [api.apiPaths.changePassword, api.apiPaths.requestEmailChange, api.apiPaths.verifyEmailChange]) {
+    const args = request(endpoint, { method: 'POST', headers: { origin: 'https://other.example.test', cookie: 'bmtech_admin_session=1; bmtech_admin_token=test-token' }, body: '{}' });
+    assert.equal((await proxy.POST(...args)).status, 403);
+  }
+});
+
+test('password change requires authentication; successful changes clear both cookies', async () => {
+  global.fetch = async () => Response.json({ message: 'Your password has been updated successfully. Please log in again.' });
+  const options = { method: 'PATCH', headers: { origin: 'https://store.example.test' }, body: '{}' };
+  assert.equal((await proxy.PATCH(...request(api.apiPaths.changePassword, options))).status, 401);
+  options.headers.cookie = 'bmtech_admin_session=1; bmtech_admin_token=test-token';
+  const response = await proxy.PATCH(...request(api.apiPaths.changePassword, options));
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('set-cookie'), /bmtech_admin_session=;.*Max-Age=0/);
+  assert.match(response.headers.get('set-cookie'), /bmtech_admin_token=;.*Max-Age=0/);
+});
+
+test('token verification works without cookies and clears sessions only on success', async () => {
+  for (const status of [201, 400]) {
+    global.fetch = async (url, init) => {
+      assert.equal(url.pathname, '/api/v1/admin/auth/email-change/verify');
+      assert.equal(init.headers.get('authorization'), null);
+      return Response.json({ message: status === 201 ? 'Updated' : 'Expired' }, { status });
+    };
+    const response = await proxy.POST(...request(api.apiPaths.verifyEmailChange, {
+      method: 'POST', headers: { origin: 'https://store.example.test', 'content-type': 'application/json' }, body: JSON.stringify({ token: 'a'.repeat(64) }),
+    }));
+    assert.equal(response.status, status);
+    assert.equal(response.headers.has('set-cookie'), status === 201);
+  }
+});
+
+test('verification page bypasses session redirect while account settings stay protected', () => {
+  assert.equal(middleware(new NextRequest('https://store.example.test/en/admin/verify-email')).headers.get('location'), null);
+  assert.match(middleware(new NextRequest('https://store.example.test/en/admin/settings/account-security')).headers.get('location'), /\/admin\/login/);
+});
+
+test('frontend validates strong passwords, matching confirmation and email syntax', () => {
+  const strong = 'Synthetic-only!234';
+  assert.equal(accountValidation.newPasswordError(strong, strong), null);
+  for (const weak of ['short!1A', 'longbutalllowercase', 'ONLYUPPERCASE123!', 'NoNumbersHere!']) {
+    assert.equal(typeof accountValidation.newPasswordError(weak, weak), 'string');
+  }
+  assert.match(accountValidation.newPasswordError(strong, strong + 'x'), /do not match/);
+  assert.equal(accountValidation.validAccountEmail('new@example.invalid'), true);
+  for (const invalid of ['bad', 'a@', 'a@b\r\nInjected: x', 'a@@b.com']) assert.equal(accountValidation.validAccountEmail(invalid), false);
+});
+>>>>>>> e36d2ff (feat: refresh BMTECH storefront branding)

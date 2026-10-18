@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./account-security.css";
 import { Providers } from "./providers";
 import { SiteFrame } from "@/components/site-frame";
 

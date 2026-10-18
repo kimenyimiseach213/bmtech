@@ -90,11 +90,27 @@ export function Providers({ children }: { children: React.ReactNode }) {
       apiRequest<unknown>(apiPaths.publicCategories),
     ]).then(([productsResult, categoriesResult]) => {
       if (!active) return;
+
+      const productRows = productsResult.status === "fulfilled" ? unwrapList(productsResult.value) : [];
+      const categoryRows = categoriesResult.status === "fulfilled" ? unwrapList(categoriesResult.value) : [];
+      const hasLiveData = productRows.length > 0 || categoryRows.length > 0;
+
+      if (productRows.length > 0) setCatalogProducts(productRows.map(normalizeProduct));
+      else setCatalogProducts(previewProducts);
+
+      if (categoryRows.length > 0) setCatalogCategories(categoryRows.map(normalizeCategory));
+      else setCatalogCategories(previewCategories);
+
       const errors: string[] = [];
-      if (productsResult.status === "fulfilled") setCatalogProducts(unwrapList(productsResult.value).map(normalizeProduct));
-      else errors.push(productsResult.reason instanceof Error ? productsResult.reason.message : "Products could not be loaded.");
-      if (categoriesResult.status === "fulfilled") setCatalogCategories(unwrapList(categoriesResult.value).map(normalizeCategory));
-      else errors.push(categoriesResult.reason instanceof Error ? categoriesResult.reason.message : "Categories could not be loaded.");
+      if (productsResult.status !== "fulfilled") {
+        errors.push(productsResult.reason instanceof Error ? productsResult.reason.message : "Products could not be loaded.");
+      }
+      if (categoriesResult.status !== "fulfilled") {
+        errors.push(categoriesResult.reason instanceof Error ? categoriesResult.reason.message : "Categories could not be loaded.");
+      }
+      if (!hasLiveData) {
+        errors.push("Preview data is being shown while the live catalogue is unavailable.");
+      }
       setCatalogError(errors.join(" "));
       setCatalogLoading(false);
     });

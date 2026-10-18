@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Zap } from "lucide-react";
 import { apiPaths, apiRequest, loginErrorMessage } from "@/lib/api";
+import { accountNotices } from "@/lib/account-security";
+import { imageUrls } from "@/lib/data";
 
 export default function AdminLoginPage() {
   const params = useParams<{ locale: string }>();
@@ -14,7 +16,13 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const french = locale === "fr";
+
+  useEffect(() => {
+    const key = new URLSearchParams(window.location.search).get("notice") || "";
+    setNotice(Object.prototype.hasOwnProperty.call(accountNotices, key) ? accountNotices[key] : "");
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,10 +43,11 @@ export default function AdminLoginPage() {
 
   return <main className="admin-login">
     <section className="admin-login-card" aria-labelledby="admin-login-title">
-      <a className="brand" href={`/${locale}`} aria-label="BMTECH home"><span className="brand-mark"><Zap size={21} fill="currentColor" /></span><span className="brand-word">BM<span>TECH</span><small>POWER SOLUTIONS</small></span></a>
+      <a className="brand brand-logo-link" href={`/${locale}`} aria-label="BMTECH home"><img className="brand-logo" src={imageUrls.logo} alt="BMTECH logo" /></a>
       <span className="admin-login-kicker"><LockKeyhole size={14} /> {french ? "ACCÈS ADMINISTRATEUR" : "ADMINISTRATOR ACCESS"}</span>
       <h1 id="admin-login-title">{french ? "Connexion" : "Sign in"}</h1>
       <p>{french ? "Connectez-vous pour gérer le catalogue et les demandes BMTECH." : "Sign in to manage the BMTECH catalogue and customer requests."}</p>
+      {notice && <div role="status" className="admin-alert account-success">{notice}</div>}
       <form onSubmit={submit}>
         <div className="form-field"><label htmlFor="admin-email">{french ? "Adresse e-mail" : "Email address"}</label><input id="admin-email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="admin@example.com" /></div>
         <div className="form-field"><label htmlFor="admin-password">{french ? "Mot de passe" : "Password"}</label><div className="admin-password-field"><input id="admin-password" type={showPassword ? "text" : "password"} autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></div>

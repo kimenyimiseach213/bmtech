@@ -13,8 +13,50 @@ export default function HomePage() {
   const { language, products, categories, catalogError, catalogLoading, company } = useStore();
   const fr = language === "fr";
   const featuredProducts = products.slice(0, 4);
-  return <main>
-    <section className="hero"><div className="container hero-grid"><div className="hero-copy"><span className="eyebrow">{fr ? "L'ÉNERGIE POUR VOS ACTIVITÉS" : "POWERING BUSINESSES & HOMES"}</span><h1>{fr ? "Des solutions d'énergie fiables pour chaque besoin." : "Reliable Power Solutions for Every Need."}</h1><p>{fr ? "Équipements de production, installations électriques, maintenance et solutions de secours à travers le Rwanda." : "Explore generator and power equipment, electrical installation, maintenance and backup solutions for homes and businesses across Rwanda."}</p><div className="hero-actions"><Link href="/products" className="button button-primary">{fr ? "Explorer les produits" : "Explore Products"}<ArrowRight size={15} /></Link><Link href="/quote" className="button button-outline">{fr ? "Demander un devis" : "Request a Quote"}<ArrowUpRight size={15} /></Link></div><div className="hero-trust"><span><Check size={14} />{fr ? "Installation professionnelle" : "Professional Installation"}</span><span><Check size={14} />{fr ? "Assistance technique" : "Technical Support"}</span><span><Check size={14} />{fr ? "Livraison offerte*" : "Free Product Delivery*"}</span></div></div><div className="hero-visual"><img className="hero-image" src={imageUrls.generator} alt="Illustrative image of industrial power equipment" /><div className="hero-image-shade"/><div className="hero-image-caption"><b>Reliable power, considered carefully.</b><small>Illustrative power systems photography</small></div><div className="hero-card"><span className="hero-card-icon"><BatteryCharging size={19}/></span><span><b>Power that fits your needs</b><small>Generator · backup · installation</small></span></div></div></div></section>
+  return <main className="home-page">
+    <section className="hero hero-showcase">
+      <div className="container hero-grid">
+        <div className="hero-copy">
+          <div className="brand-hero">
+            <div className="brand-hero-mark"><Cog size={74} /></div>
+            <div className="brand-hero-copy">
+              <span className="brand-hero-title">BM <span>TECH</span></span>
+              <span className="brand-hero-sub">LIMITED</span>
+              <span className="brand-hero-tag">FAST AND FINE</span>
+            </div>
+          </div>
+
+          <h1>POWER SOLUTIONS</h1>
+          <p className="hero-kicker">FOR A BETTER TOMORROW</p>
+          <p className="hero-description">Sales, Installation, Repair and Maintenance of Generators, Inverters, Changeover Switches and Electrical Equipment.</p>
+
+          <div className="hero-feature-chips">
+            <span><BatteryCharging size={17} />Generators</span>
+            <span><Wrench size={17} />Inverters</span>
+            <span><Zap size={17} />Changeover Switches</span>
+          </div>
+
+          <div className="hero-actions">
+            <Link href="/products" className="button button-primary hero-button-primary">Explore Our Products<ArrowRight size={15} /></Link>
+          </div>
+        </div>
+
+        <div className="hero-visual">
+          <div className="hero-image-wrap">
+            <img className="hero-image" src={imageUrls.generator} alt="Industrial power equipment and generators" />
+          </div>
+          <div className="hero-floating-card hero-floating-card-top">
+            <span className="hero-card-icon"><BatteryCharging size={18} /></span>
+            <div><strong>Power backup ready</strong><small>Commercial & residential</small></div>
+          </div>
+          <div className="hero-floating-card hero-floating-card-bottom">
+            <span className="hero-card-icon"><Zap size={18} /></span>
+            <div><strong>Switch & backup</strong><small>Installation support</small></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section className="trust-strip"><div className="container trust-grid"><FeatureItem icon={ShieldCheck} title={fr ? "Équipement de qualité" : "Quality Power Equipment"} text={fr ? "Des options pour chaque besoin" : "Options for different needs"}/><FeatureItem icon={Wrench} title={fr ? "Installation professionnelle" : "Professional Installation"} text={fr ? "Évaluation selon le site" : "Site requirements considered"}/><FeatureItem icon={Cog} title={fr ? "Maintenance fiable" : "Reliable Maintenance"} text={fr ? "Support technique" : "Technical support enquiries"}/><FeatureItem icon={Truck} title={fr ? "Livraison gratuite*" : "Free Product Delivery*"} text={fr ? "À confirmer auprès de BMTECH" : "Confirm arrangements with BMTECH"}/></div></section>
 
     <section className="section"><div className="container"><SectionHeading eyebrow={fr ? "NOS CATÉGORIES" : "POWER EQUIPMENT"} title={fr ? "Trouvez la bonne solution" : "Explore our equipment categories"} description={fr ? "Parcourez les équipements de production, de commutation et d'alimentation de secours." : "Browse generation, switching and backup power equipment for residential and commercial needs."} link={{ label: fr ? "Tous les produits" : "View all products", href: "/products" }}/><div className="category-grid">{categories.map((category, i) => <Link href={`/products?category=${encodeURIComponent(category.name)}`} className="category-card" key={category.name}><PhotoCycler className="category-photo-cycler" images={category.images} fit="cover" interval={4200}/><div className="category-card-content"><span>0{i+1} · EQUIPMENT</span><h3>{fr ? category.nameFr : category.name}</h3><p>{category.summary}</p><span className="text-link">{fr ? "Explorer la catégorie" : "Explore category"}<ArrowRight size={14}/></span></div></Link>)}</div></div></section>

@@ -1,0 +1,26 @@
+.admin-settings-nav-wrap{max-width:1300px;margin:0 auto;padding:24px 30px 0}
+.admin-settings-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;border-bottom:1px solid var(--line);padding-bottom:12px}
+.admin-settings-tabs a{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:7px;color:var(--slate);font-size:12px}
+.admin-settings-tabs a[aria-current=page]{background:#e8f0ff;color:var(--blue);font-weight:700}
+.account-security-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;align-items:start}
+.account-security-card{padding:25px}
+.account-card-heading{display:flex;align-items:center;gap:10px;color:var(--blue);margin-bottom:12px}
+.account-card-heading h2{font-size:17px;margin:0}
+.account-security-card>p{font-size:12px;line-height:1.65;color:var(--slate);margin-bottom:22px}
+.account-security-card form{display:grid;gap:17px}
+.account-security-card .admin-form-field{font-size:12px;gap:7px}
+.account-security-card .admin-form-field input{font-size:13px;min-height:43px}
+.account-security-card input[readonly]{background:#f4f6f9;color:#536478}
+.account-password-input{position:relative}
+.account-password-input input{padding-right:45px!important}
+.account-password-input button{position:absolute;right:3px;top:3px;bottom:3px;width:38px;border:0;background:transparent;display:grid;place-items:center;color:#68778a;cursor:pointer}
+.account-security-card .button{justify-self:start;min-height:42px;font-size:12px}
+.account-field-help{font-size:11px;line-height:1.6;color:var(--slate);margin:-8px 0 0}
+.account-pending{display:grid;gap:5px;padding:14px;border:1px solid #e5c67c;border-radius:7px;background:#fff9e8;color:#725318;font-size:12px;overflow-wrap:anywhere}
+.account-pending small{font-size:11px;line-height:1.5}
+.account-success{border:1px solid #b4dfc8;background:#edf9f2;color:#17613d}
+.account-verify .button{margin-top:18px}
+.account-verify>svg{color:var(--blue)}
+.account-back-link{display:block;text-align:center;margin-top:20px;font-size:12px;color:var(--blue)}
+.account-security input:focus-visible,.account-security button:focus-visible,.admin-settings-tabs a:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+@media(max-width:900px){.account-security-grid{grid-template-columns:1fr}.account-security-card{padding:20px}.admin-settings-nav-wrap{padding:20px 16px 0}}

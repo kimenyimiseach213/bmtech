@@ -1,5 +1,19 @@
 import type { Product, ProductCategory, ProductImage } from "@/types";
 
+function publicImageUrl(value: string): string {
+  if (!value || value.startsWith("data:") || value.startsWith("blob:")) return value;
+  try {
+    const currentOrigin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+    const url = new URL(value, currentOrigin);
+    const localUploadUrl = ["localhost", "127.0.0.1"].includes(url.hostname) && url.pathname.startsWith("/uploads/");
+    if (!url.pathname.startsWith("/uploads/") || (url.origin !== currentOrigin && !localUploadUrl)) return value;
+    const base = process.env.NEXT_PUBLIC_BMTECH_API_ORIGIN || "";
+    return base ? new URL(`${url.pathname}${url.search}`, base.endsWith("/") ? base : `${base}/`).toString() : value;
+  } catch {
+    return value;
+  }
+}
+
 export class ApiError extends Error {
   status: number;
   details: unknown;
@@ -65,6 +79,10 @@ export const apiPaths = {
   product: (slug: string) => `api/v1/products/${encodeURIComponent(slug)}`,
   login: "api/v1/admin/auth/login",
   logout: "api/v1/admin/auth/logout",
+  account: "api/v1/admin/auth/account",
+  changePassword: "api/v1/admin/auth/change-password",
+  requestEmailChange: "api/v1/admin/auth/email-change/request",
+  verifyEmailChange: "api/v1/admin/auth/email-change/verify",
   admin: (resource: string) => `api/v1/admin/${resource}`,
   dashboard: "api/v1/admin/dashboard/summary",
   publicSettings: "api/v1/settings/public",
@@ -81,7 +99,7 @@ const textValue = (value: unknown, fallback = "") => typeof value === "string" ?
 const numberValue = (value: unknown, fallback = 0) => typeof value === "number" ? value : Number.isFinite(Number(value)) ? Number(value) : fallback;
 const localImages = (value: unknown): ProductImage[] => Array.isArray(value) ? value.map((entry, index) => {
   const image = asRecord(entry);
-  const src = textValue(image.url, textValue(image.src, textValue(image.path)));
+  const src = publicImageUrl(textValue(image.url, textValue(image.src, textValue(image.path))));
   return src ? { src, alt: textValue(image.alt, `Product photo ${index + 1}`) } : null;
 }).filter((image): image is ProductImage => image !== null) : [];
 
@@ -105,7 +123,7 @@ export function normalizeProduct(payload: unknown): Product {
   const descriptions = asRecord(item.descriptions);
   const categoryRecord = asRecord(item.category);
   const imageRows = localImages(item.images);
-  const primaryImage = textValue(item.coverImageUrl, textValue(item.imageUrl, textValue(item.image, imageRows[0]?.src ?? "")));
+  const primaryImage = publicImageUrl(textValue(item.coverImageUrl, textValue(item.imageUrl, textValue(item.image, imageRows[0]?.src ?? ""))));
   const slug = textValue(item.slug, textValue(item.id, "product"));
   const fallbackName = textValue(item.name, slug);
   const nameEn = textValue(nameRecord.en, textValue(names.en, textValue(item.nameEn, fallbackName)));

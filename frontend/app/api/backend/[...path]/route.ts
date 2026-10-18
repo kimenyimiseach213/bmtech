@@ -79,7 +79,13 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const incomingCookie = request.headers.get("cookie") ?? "";
   const isLogin = pathValue === "api/v1/admin/auth/login";
   const isLogout = pathValue === "api/v1/admin/auth/logout";
-  if (pathValue.startsWith("api/v1/admin/") && !isLogin && !isLogout && !readCookie(incomingCookie, SESSION_COOKIE)) {
+  const isEmailVerification = pathValue === "api/v1/admin/auth/email-change/verify";
+  const isPasswordChange = pathValue === "api/v1/admin/auth/change-password";
+  const isAccountMutation = isPasswordChange || isEmailVerification || pathValue === "api/v1/admin/auth/email-change/request";
+  if (isAccountMutation && !["GET", "HEAD"].includes(request.method) && request.headers.get("origin") !== request.nextUrl.origin) {
+    return Response.json({ message: "This account request must come from the BMTECH website." }, { status: 403 });
+  }
+  if (pathValue.startsWith("api/v1/admin/") && !isLogin && !isLogout && !isEmailVerification && !readCookie(incomingCookie, SESSION_COOKIE)) {
     return Response.json({ message: "Administrator authentication is required." }, { status: 401 });
   }
   const accessToken = readCookie(incomingCookie, TOKEN_COOKIE);
@@ -148,7 +154,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       } catch { /* Keep a non-JSON login response unchanged. */ }
     }
   }
-  if (isLogout || (pathValue.startsWith("api/v1/admin/") && upstream.status === 401)) {
+  if (isLogout || ((isPasswordChange || isEmailVerification) && upstream.ok) || (pathValue.startsWith("api/v1/admin/") && upstream.status === 401)) {
     responseHeaders.append("set-cookie", cookieOptions(SESSION_COOKIE, "", 0));
     responseHeaders.append("set-cookie", cookieOptions(TOKEN_COOKIE, "", 0));
   }

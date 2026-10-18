@@ -78,10 +78,22 @@ export function RequestForm({ kind, initialSelection = "" }: { kind: Kind; initi
     setLoading(true);
     setSubmitError("");
     const clientReference = `BM-${{ quote: "Q", booking: "B", contact: "M", review: "R" }[kind]}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 5).toUpperCase()}`;
-    const payload: Record<string, unknown> = { ...values, locale: language, clientReference };
-    if (kind === "quote") payload.productOrService = values.selection;
-    if (kind === "booking") { payload.serviceType = values.service; payload.preferredDate = values.date; payload.preferredTime = values.time; }
-    if (kind === "review") { payload.displayName = values.name; payload.rating = Number.parseInt(values.rating?.slice(0, 1) ?? "5", 10); payload.comment = values.experience; }
+    const common = { name: values.name.trim(), locale: language, clientReference };
+    const payload: Record<string, unknown> = kind === "quote" ? {
+      ...common, phone: values.phone.trim(), email: values.email.trim() || undefined,
+      selection: values.selection.trim(), location: values.location.trim(), contact: values.contact,
+      details: values.details.trim(),
+    } : kind === "booking" ? {
+      ...common, phone: values.phone.trim(), email: values.email.trim() || undefined,
+      service: values.service, date: values.date, time: values.time,
+      location: values.location.trim(), details: values.details.trim(),
+    } : kind === "contact" ? {
+      ...common, phone: values.phone.trim(), email: values.email.trim() || undefined,
+      message: values.message.trim(),
+    } : {
+      ...common, displayName: values.name.trim(), rating: Number.parseInt(values.rating?.slice(0, 1) ?? "5", 10),
+      experience: values.experience.trim(),
+    };
     const endpoints = { quote: apiPaths.quoteCreate, booking: apiPaths.bookingCreate, contact: apiPaths.contactCreate, review: apiPaths.reviewCreate };
     try {
       const response = await apiRequest<unknown>(endpoints[kind], { method: "POST", body: JSON.stringify(payload) });

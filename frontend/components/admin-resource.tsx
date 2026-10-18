@@ -16,7 +16,7 @@ const config: Record<ResourceKey, { title: string; subtitle: string; endpoint: s
     { key: "nameEn", label: "Name (English)", required: true }, { key: "nameFr", label: "Name (French)", required: true },
     { key: "descriptionEn", label: "Description (English)", type: "textarea", wide: true }, { key: "descriptionFr", label: "Description (French)", type: "textarea", wide: true },
     { key: "condition", label: "Condition", type: "select", options: ["NEW", "USED"] }, { key: "priceMode", label: "Price mode", type: "select", options: ["FIXED", "QUOTE_REQUIRED"] },
-    { key: "price", label: "Price (RWF)", type: "number" }, { key: "stockQuantity", label: "Stock quantity", type: "number" }, { key: "isPublished", label: "Published on storefront", type: "checkbox" },
+    { key: "price", label: "Price (RWF)", type: "number" }, { key: "stockQuantity", label: "Stock quantity", type: "number" }, { key: "installationAvailable", label: "Installation available", type: "checkbox" }, { key: "isPublished", label: "Published on storefront", type: "checkbox" },
   ], columns: [{ key: "nameEn", label: "Product" }, { key: "sku", label: "SKU" }, { key: "category", label: "Category" }, { key: "stockQuantity", label: "Stock" }, { key: "price", label: "Price" }, { key: "status", label: "Status" }] },
   categories: { title: "Categories", subtitle: "Create and organize active storefront categories in English and French.", endpoint: "categories", fields: [
     { key: "nameEn", label: "Name (English)", required: true }, { key: "nameFr", label: "Name (French)", required: true }, { key: "slug", label: "Slug", required: true },
@@ -24,7 +24,7 @@ const config: Record<ResourceKey, { title: string; subtitle: string; endpoint: s
     { key: "sortOrder", label: "Display order", type: "number" }, { key: "isActive", label: "Active on storefront", type: "checkbox" },
   ], columns: [{ key: "nameEn", label: "Category" }, { key: "slug", label: "Slug" }, { key: "sortOrder", label: "Order" }, { key: "isActive", label: "Visibility" }] },
   orders: { title: "Orders", subtitle: "Review customer details, fulfillment choices, item snapshots and payment status.", endpoint: "orders", fields: [], columns: [{ key: "reference", label: "Reference" }, { key: "customer.name", label: "Customer" }, { key: "fulfillment", label: "Fulfillment" }, { key: "total", label: "Total" }, { key: "paymentStatus", label: "Payment" }, { key: "status", label: "Order status" }] },
-  payments: { title: "Payments", subtitle: "Review submitted payment details and record manual verification through the API.", endpoint: "payments", fields: [], columns: [{ key: "reference", label: "Reference" }, { key: "order.reference", label: "Order" }, { key: "method", label: "Method" }, { key: "amount", label: "Amount" }, { key: "status", label: "Status" }, { key: "verifiedAt", label: "Verified" }] },
+  payments: { title: "Payments", subtitle: "Review submitted payment details and record manual verification through the API.", endpoint: "orders", fields: [], columns: [{ key: "payment.reference", label: "Reference" }, { key: "reference", label: "Order" }, { key: "payment.method", label: "Method" }, { key: "payment.amount", label: "Amount" }, { key: "payment.status", label: "Status" }, { key: "payment.verifiedAt", label: "Verified" }] },
   quotations: { title: "Quotation requests", subtitle: "Review customer requirements, assign quoted amounts and update request status.", endpoint: "quotation-requests", fields: [
     { key: "status", label: "Status", type: "select", options: ["OPEN", "IN_REVIEW", "QUOTED", "ACCEPTED", "REJECTED", "CLOSED"] },
     { key: "quotedAmount", label: "Quoted amount (RWF)", type: "number" }, { key: "adminNotes", label: "Internal notes", type: "textarea", wide: true },
@@ -109,9 +109,9 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
     try {
       const response = await apiRequest<unknown>(apiPaths.admin(conf.endpoint));
       const data = unwrapList(response);
-      if (resource === "settings" && data.length === 0) {
+      if (resource === "settings") {
         const root = record(response); const nested = record(root.data);
-        const setting = record(nested.settings ?? nested.company ?? root.settings ?? (Object.keys(nested).length ? nested : root));
+        const setting = record(nested.settings ?? nested.company ?? root.settings ?? nested);
         setRows(Object.keys(setting).length ? [setting] : []);
       } else setRows(data.map(record));
     } catch (reason) {
@@ -189,14 +189,20 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
         const response = await apiRequest<unknown>(apiPaths.admin(`products/${encodeURIComponent(productId)}/images`), { method: "POST", body: formData });
         const payload = record(response); const data = record(payload.data);
         const serverImages = Array.isArray(payload.images) ? payload.images : Array.isArray(data.images) ? data.images : unwrapList(response);
-        const image = record(serverImages[0]);
-        uploaded.push({ key: source.key ?? `uploaded-${index}`, id: image.id ? String(image.id) : undefined, src: String(image.url ?? image.src ?? source.src ?? ""), alt: String(image.alt ?? source.alt ?? "Product photo") });
+        if (serverImages.length === 0) throw new Error("The upload succeeded without returning a saved image. Refresh the product before retrying.");
+        const savedImages = serverImages.map(record);
+        if (savedImages.some((image) => !image.id)) throw new Error("The backend uploaded the photo but did not return every saved image ID.");
+        savedImages.forEach((image, savedIndex) => uploaded.push({
+          key: savedImages.length === newImages.length ? newImages[savedIndex].key : source.key,
+          id: String(image.id), src: String(image.url ?? image.src ?? source.src ?? ""),
+          alt: String(image.alt ?? source.alt ?? "Product photo"),
+        }));
       }
     }
     const merged = images.map((image) => image.file ? uploaded.find((uploadedImage) => uploadedImage.key === image.key) ?? image : image);
     const imageIds = merged.map((image) => image.id).filter((id): id is string => Boolean(id));
     const coverImageId = merged.find((image) => image.key === images[0]?.key)?.id;
-    if (imageIds.length || merged.length === 0) {
+    if (imageIds.length === merged.length) {
       await apiRequest(apiPaths.admin(`products/${encodeURIComponent(productId)}/images/reorder`), {
         method: "PATCH", body: JSON.stringify({ imageIds, coverImageId }),
       });
@@ -244,14 +250,14 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
   }
 
   async function verifyPayment(item: Row) {
-    const paymentId = idOf(item);
+    const paymentId = String(byPath(item, "payment.id") ?? item.id ?? "");
     const orderId = String(item.orderId ?? byPath(item, "order.id") ?? "");
     const path = orderId
       ? apiPaths.admin(`orders/${encodeURIComponent(orderId)}/payment/verify`)
       : apiPaths.admin(`payments/${encodeURIComponent(paymentId)}/verify`);
     setError("");
     try {
-      await apiRequest(path, { method: "POST", body: JSON.stringify({ status: "VERIFIED", paymentStatus: "PAID", verified: true }) });
+      await apiRequest(path, { method: "POST" });
       notify(french ? "Paiement vérifié par le serveur." : "Payment verification recorded by the server."); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Payment verification failed."); }
   }
@@ -274,7 +280,7 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
       <div className="admin-toolbar"><label className="admin-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={french ? "Rechercher…" : "Search records…"} /></label>{resource === "products" && <><label className="admin-filter-label">Category<select className="select-control" value={productCategoryFilter} onChange={(event) => setProductCategoryFilter(event.target.value)}><option value="all">All categories</option>{categoryOptions.map((category) => <option key={idOf(category)} value={idOf(category)}>{String(category.nameEn ?? byPath(category, "name.en") ?? category.name ?? idOf(category))}</option>)}</select></label><label className="admin-filter-label">Condition<select className="select-control" value={productConditionFilter} onChange={(event) => setProductConditionFilter(event.target.value)}><option value="all">All</option><option value="new">New</option><option value="used">Used</option></select></label></>}<label className="admin-filter-label">{french ? "Statut" : "Status"}<select className="select-control" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{french ? "Tous" : "All statuses"}</option>{["pending", "open", "unread", "handled", "approved", "hidden", "active", "inactive", "paid", "verified", "rejected"].map((value) => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}</select></label><span className="admin-record-count">{loading ? "…" : `${visibleRows.length} ${french ? "éléments" : "records"}`}</span></div>
       {loading ? <div className="admin-loading"><LoaderCircle className="admin-spin" size={20} />{french ? "Chargement des données…" : "Loading records from API…"}</div> : error && rows.length === 0 ? <div className="admin-empty"><ShieldCheck size={24} /><b>{french ? "Connexion au serveur requise" : "Backend connection required"}</b><p>{error}</p><small>{french ? "Aucun enregistrement local n’a été présenté comme sauvegardé." : "No local records are shown as if they were saved."}</small></div> : visibleRows.length === 0 ? <div className="admin-empty"><FilePlus2 size={24} /><b>{french ? "Aucun résultat" : "No records found"}</b><p>{french ? "Ajustez votre recherche ou créez un élément." : "Change the search or add the first record."}</p></div> : <div className="admin-table-wrap"><table className="admin-table admin-wide-table"><thead><tr>{conf.columns.map((column) => <th key={column.key}>{column.label}</th>)}<th className="admin-actions-head">Actions</th></tr></thead><tbody>{visibleRows.map((item, index) => <tr key={idOf(item) || index}>{conf.columns.map((column) => <td key={column.key}>{column.key === "status" || column.key === "paymentStatus" || column.key === "isActive" ? <span className={`admin-status-pill ${(String(columnValue(item, column.key) ?? (item.isActive ? "active" : "inactive"))).toLowerCase().replace(/[^a-z]+/g, "-")}`}>{displayValue(columnValue(item, column.key) ?? (column.key === "isActive" ? item.isActive : undefined), column.key)}</span> : <span className={column.key === "message" || column.key === "experience" ? "admin-cell-truncate" : ""} title={String(columnValue(item, column.key) ?? "")}>{displayValue(columnValue(item, column.key), column.key)}</span>}</td>)}<td><div className="admin-row-actions">
         {(resource === "products" || resource === "categories" || resource === "quotations" || resource === "bookings" || resource === "messages" || resource === "reviews" || resource === "settings") && <button className="admin-icon-action" title="Edit" aria-label={`Edit ${idOf(item)}`} onClick={() => openEditor(item)}><Pencil size={14} /></button>}
-        {(resource === "orders" || resource === "payments") && <button className="admin-small-action" onClick={() => void verifyPayment(item)}><ShieldCheck size={13} />{french ? "Vérifier" : "Verify payment"}</button>}
+        {(resource === "orders" || resource === "payments") && String(resource === "payments" ? byPath(item, "payment.status") : item.paymentStatus).toUpperCase() !== "VERIFIED" && <button className="admin-small-action" onClick={() => void verifyPayment(item)}><ShieldCheck size={13} />{french ? "Vérifier" : "Verify payment"}</button>}
         {resource === "categories" && <><button className="admin-icon-action" title="Move up" aria-label="Move category up" onClick={() => { const order = Number(item.sortOrder ?? index); void apiRequest(apiPaths.admin(`categories/${encodeURIComponent(idOf(item))}/reorder`), { method: "PATCH", body: JSON.stringify({ sortOrder: order - 1 }) }).then(load).catch((reason) => setError(reason instanceof Error ? reason.message : "Reorder failed.")); }}><ArrowUp size={14} /></button><button className="admin-icon-action" title="Move down" aria-label="Move category down" onClick={() => { const order = Number(item.sortOrder ?? index); void apiRequest(apiPaths.admin(`categories/${encodeURIComponent(idOf(item))}/reorder`), { method: "PATCH", body: JSON.stringify({ sortOrder: order + 1 }) }).then(load).catch((reason) => setError(reason instanceof Error ? reason.message : "Reorder failed.")); }}><ArrowDown size={14} /></button><button className="admin-small-action" onClick={() => void updateStatus(item, item.isActive ? "INACTIVE" : "ACTIVE")}>{item.isActive ? "Deactivate" : "Activate"}</button></>}
         {resource === "bookings" && <><button className="admin-small-action" onClick={() => void updateStatus(item, "APPROVED")}>Approve</button><button className="admin-small-action" onClick={() => { openEditor(item); setValues((current) => ({ ...current, status: "RESCHEDULED" })); }}>Reschedule</button><button className="admin-small-action danger" onClick={() => void updateStatus(item, "REJECTED")}>Reject</button></>}
         {resource === "messages" && <><a className="admin-icon-action admin-whatsapp-action" href={waHref(customerPhone(item), `Hello ${String(item.name ?? byPath(item, "customer.name") ?? "").trim()}, BMTECH is following up on your message.`)} target="_blank" rel="noreferrer" title="Open WhatsApp chat" aria-label="Open WhatsApp chat"><MessageCircle size={14} /></a><button className="admin-small-action" onClick={() => void updateStatus(item, "HANDLED")}>Mark handled</button><button className="admin-icon-action" title="Read message" aria-label="Read message" onClick={() => openEditor(item)}><Eye size={14} /></button></>}

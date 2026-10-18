@@ -30,6 +30,9 @@ export function middleware(request: NextRequest) {
   }
 
   if (segments[1] === "admin") {
+    // Email verification is authorized by its single-use token, even after a
+    // session has expired. GET only renders a confirmation screen.
+    if (segments.length === 3 && segments[2] === "verify-email") return NextResponse.next();
     const isLogin = segments[2] === "login";
     const hasSession = Boolean(request.cookies.get(sessionCookie)?.value);
     if (segments.length === 2 && hasSession) {

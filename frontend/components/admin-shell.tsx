@@ -17,7 +17,7 @@ const navigation = [
   { key: "bookings", label: "Technician bookings", icon: CalendarDays },
   { key: "messages", label: "Messages", icon: Mail },
   { key: "reviews", label: "Reviews", icon: Star },
-  { key: "settings", label: "Company settings", icon: Settings },
+  { key: "settings", label: "Settings", icon: Settings },
 ];
 
 const frenchLabels: Record<string, string> = {
@@ -32,7 +32,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const locale = pathname.match(/^\/(en|fr)(?:\/|$)/)?.[1] ?? language;
   const french = locale === "fr";
 
-  if (pathname.endsWith("/admin/login")) return <>{children}</>;
+  if (pathname.endsWith("/admin/login") || pathname.endsWith("/admin/verify-email")) return <>{children}</>;
 
   async function logout() {
     setLoggingOut(true);
@@ -51,7 +51,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <aside className="admin-sidebar">
       <Link href={`/${locale}/admin/dashboard`} className="brand" aria-label="BMTECH admin dashboard"><span className="brand-mark"><Zap size={20} fill="currentColor" /></span><span className="brand-word">BM<span>TECH</span><small>ADMIN CONSOLE</small></span></Link>
       <div className="admin-nav-label">{french ? "GESTION" : "WORKSPACE"}</div>
-      <nav aria-label="Admin navigation">{navigation.map(({ key, label, icon: Icon }) => <Link key={key} href={`/${locale}/admin/${key}`} className={activeSection === key ? "admin-active" : ""}><Icon size={16} /><span>{french ? frenchLabels[label] : label}</span></Link>)}</nav>
+      <nav aria-label="Admin navigation">{navigation.map(({ key, label, icon: Icon }) => <Link key={key} href={`/${locale}/admin/${key}`} className={activeSection === key ? "admin-active" : ""}><Icon size={16} /><span>{french ? frenchLabels[label] ?? (label === "Settings" ? "Paramètres" : label) : label}</span></Link>)}</nav>
       <div className="admin-sidebar-bottom"><span className="admin-secure-badge"><ShieldCheck size={14} />{french ? "Espace sécurisé" : "Secure workspace"}</span><Link href={`/${locale}`} className="admin-store-link"><Activity size={14} />{french ? "Voir le site public" : "View public storefront"}</Link></div>
     </aside>
     <div className="admin-main">
