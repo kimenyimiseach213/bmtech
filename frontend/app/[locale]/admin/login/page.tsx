@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, LockKeyhole, Zap } from "lucide-react";
 import { apiPaths, apiRequest, loginErrorMessage } from "@/lib/api";
 import { accountNotices } from "@/lib/account-security";
 import { imageUrls } from "@/lib/data";
@@ -54,6 +54,7 @@ export default function AdminLoginPage() {
         {error && <div role="alert" className="admin-alert admin-alert-error">{error}</div>}
         <button className="button button-primary button-block admin-login-submit" type="submit" disabled={loading}>{loading ? (french ? "Connexion…" : "Signing in…") : (french ? "Se connecter" : "Sign in")}<ArrowRight size={15} /></button>
       </form>
+      <a className="button button-outline admin-login-back-link" href={`/${locale}`}><ArrowLeft size={15} />{french ? "Retour au site" : "Back to website"}</a>
       <p className="admin-login-note">{french ? "Les comptes administrateur sont créés par un administrateur autorisé. L’inscription publique est désactivée." : "Administrator accounts are created through authorized onboarding. Public sign-up is disabled."}</p>
     </section>
   </main>;

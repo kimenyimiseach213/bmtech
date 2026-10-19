@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, Boxes, CalendarDays, ChevronDown, ClipboardList, FileText, FolderTree, LayoutDashboard, LogOut, Mail, MessageSquareText, Package, Settings, ShieldCheck, Star, Wallet, Zap } from "lucide-react";
+import { Activity, ArrowLeft, Boxes, CalendarDays, ChevronDown, ClipboardList, FileText, FolderTree, LayoutDashboard, LogOut, Mail, MessageSquareText, Package, Settings, ShieldCheck, Star, Wallet, Zap } from "lucide-react";
 import { LocaleLink as Link } from "@/components/locale-link";
 import { useStore } from "@/app/providers";
 import { apiPaths, apiRequest } from "@/lib/api";
@@ -55,7 +55,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="admin-sidebar-bottom"><span className="admin-secure-badge"><ShieldCheck size={14} />{french ? "Espace sécurisé" : "Secure workspace"}</span><Link href={`/${locale}`} className="admin-store-link"><Activity size={14} />{french ? "Voir le site public" : "View public storefront"}</Link></div>
     </aside>
     <div className="admin-main">
-      <header className="admin-topbar"><div><span className="admin-topbar-path">BMTECH / <b>{navigation.find((item) => item.key === activeSection)?.label ?? "Admin"}</b></span></div><div className="admin-topbar-actions"><label className="admin-locale-select"><span className="sr-only">Language</span><select value={locale} onChange={(event) => { const next = event.target.value as "en" | "fr"; setLanguage(next); router.push(pathname.replace(/^\/(en|fr)(?=\/|$)/, `/${next}`)); }}><option value="en">EN</option><option value="fr">FR</option></select><ChevronDown size={13} /></label><span className="admin-user-chip"><span className="admin-user-avatar">A</span><b>{french ? "Administrateur" : "Administrator"}</b></span><button type="button" className="admin-logout" onClick={logout} disabled={loggingOut}><LogOut size={15} />{loggingOut ? (french ? "Déconnexion…" : "Signing out…") : (french ? "Quitter" : "Sign out")}</button></div></header>
+      <header className="admin-topbar"><div><span className="admin-topbar-path">BMTECH / <b>{navigation.find((item) => item.key === activeSection)?.label ?? "Admin"}</b></span></div><div className="admin-topbar-actions"><Link href={`/${locale}`} className="admin-back-site"><ArrowLeft size={14} /><span>{french ? "Retour au site" : "Back to website"}</span></Link><label className="admin-locale-select"><span className="sr-only">Language</span><select value={locale} onChange={(event) => { const next = event.target.value as "en" | "fr"; setLanguage(next); router.push(pathname.replace(/^\/(en|fr)(?=\/|$)/, `/${next}`)); }}><option value="en">EN</option><option value="fr">FR</option></select><ChevronDown size={13} /></label><span className="admin-user-chip"><span className="admin-user-avatar">A</span><b>{french ? "Administrateur" : "Administrator"}</b></span><button type="button" className="admin-logout" onClick={logout} disabled={loggingOut}><LogOut size={15} />{loggingOut ? (french ? "Déconnexion…" : "Signing out…") : (french ? "Quitter" : "Sign out")}</button></div></header>
       {children}
     </div>
   </div>;
