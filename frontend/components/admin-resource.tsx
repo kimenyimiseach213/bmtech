@@ -49,6 +49,157 @@ const record = (value: unknown): Row => value && typeof value === "object" ? val
 function byPath(value: unknown, path: string): unknown {
   return path.split(".").reduce<unknown>((current, key) => record(current)[key], value);
 }
+function detailText(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "";
+  return String(value);
+}
+function detailDate(value: unknown, locale: string): string {
+  const text = detailText(value);
+  if (!text) return "";
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? text : new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+function detailStatus(value: unknown): string {
+  return detailText(value).toLowerCase().replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+function detailMoney(value: unknown, locale: string): string {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(amount)} RWF` : detailText(value);
+}
+
+function DetailField({ label, value, wide = false }: { label: string; value: unknown; wide?: boolean }) {
+  const text = detailText(value);
+  if (!text) return null;
+  return <div className={`admin-detail-field ${wide ? "wide" : ""}`}><dt>{label}</dt><dd>{text}</dd></div>;
+}
+
+function OrderDetails({ item, french }: { item: Row; french: boolean }) {
+  const customer = record(item.customer);
+  const payment = record(item.payment);
+  const items = Array.isArray(item.items) ? item.items.map(record) : [];
+  const dateLocale = french ? "fr-RW" : "en-RW";
+  const t = french ? {
+    summary: "Résumé de la commande", reference: "Référence", clientReference: "Référence client",
+    orderId: "Identifiant de commande", status: "Statut de la commande", paymentStatus: "Statut du paiement",
+    fulfillment: "Mode de livraison", total: "Total", locale: "Langue de commande",
+    customer: "Informations client", name: "Nom", phone: "Téléphone", email: "E-mail",
+    delivery: "Adresse de livraison", notes: "Notes", items: "Articles commandés",
+    product: "Produit", sku: "Référence SKU", quantity: "Quantité", unitPrice: "Prix unitaire",
+    lineTotal: "Total de la ligne", noItems: "Aucun article n’est associé à cette commande.",
+    paymentDetails: "Détails du paiement", method: "Mode de paiement", amount: "Montant payé",
+    verifiedAt: "Vérifié le", createdAt: "Commande créée le", updatedAt: "Dernière mise à jour",
+    system: "Informations système",
+  } : {
+    summary: "Order summary", reference: "Order reference", clientReference: "Customer reference",
+    orderId: "Order ID", status: "Order status", paymentStatus: "Payment status",
+    fulfillment: "Fulfillment method", total: "Order total", locale: "Order language",
+    customer: "Customer information", name: "Customer name", phone: "Phone", email: "Email",
+    delivery: "Delivery address", notes: "Customer notes", items: "Items in this order",
+    product: "Product", sku: "SKU", quantity: "Quantity", unitPrice: "Unit price",
+    lineTotal: "Line total", noItems: "No items are associated with this order.",
+    paymentDetails: "Payment details", method: "Payment method", amount: "Amount paid",
+    verifiedAt: "Verified at", createdAt: "Order placed", updatedAt: "Last updated",
+    system: "System information",
+  };
+  return <div className="admin-order-details">
+    <section className="admin-detail-section">
+      <h3>{t.summary}</h3>
+      <dl className="admin-detail-grid">
+        <DetailField label={t.reference} value={item.reference} />
+        <DetailField label={t.clientReference} value={item.clientReference} />
+        <DetailField label={t.status} value={detailStatus(item.status)} />
+        <DetailField label={t.paymentStatus} value={detailStatus(item.paymentStatus)} />
+        <DetailField label={t.fulfillment} value={detailStatus(item.fulfillment)} />
+        <DetailField label={t.total} value={item.total == null ? "" : detailMoney(item.total, dateLocale)} />
+        <DetailField label={t.locale} value={detailText(item.locale).toUpperCase()} />
+      </dl>
+    </section>
+    <section className="admin-detail-section">
+      <h3>{t.customer}</h3>
+      <dl className="admin-detail-grid">
+        <DetailField label={t.name} value={customer.name ?? item.customerName} />
+        <DetailField label={t.phone} value={customer.phone ?? item.customerPhone} />
+        <DetailField label={t.email} value={customer.email ?? item.customerEmail} />
+        <DetailField label={t.delivery} value={item.deliveryAddress} wide />
+        <DetailField label={t.notes} value={item.notes} wide />
+      </dl>
+    </section>
+    <section className="admin-detail-section">
+      <h3>{t.items}</h3>
+      {items.length ? <div className="admin-order-items-wrap"><table className="admin-order-items">
+        <thead><tr><th>{t.product}</th><th>{t.sku}</th><th>{t.quantity}</th><th>{t.unitPrice}</th><th>{t.lineTotal}</th></tr></thead>
+        <tbody>{items.map((orderItem, index) => <tr key={detailText(orderItem.id) || `${detailText(orderItem.productSlug)}-${index}`}>
+          <td>{detailText(orderItem.productName ?? orderItem.name ?? orderItem.productSlug) || "—"}</td>
+          <td>{detailText(orderItem.sku) || "—"}</td>
+          <td>{detailText(orderItem.quantity) || "—"}</td>
+          <td>{orderItem.unitPrice == null ? "—" : detailMoney(orderItem.unitPrice, dateLocale)}</td>
+          <td>{orderItem.lineTotal == null ? "—" : detailMoney(orderItem.lineTotal, dateLocale)}</td>
+        </tr>)}</tbody>
+      </table></div> : <p className="admin-detail-empty">{t.noItems}</p>}
+    </section>
+    {Object.keys(payment).length > 0 && <section className="admin-detail-section">
+      <h3>{t.paymentDetails}</h3>
+      <dl className="admin-detail-grid">
+        <DetailField label={t.method} value={detailStatus(payment.method)} />
+        <DetailField label={t.amount} value={payment.amount == null ? "" : detailMoney(payment.amount, dateLocale)} />
+        <DetailField label={t.paymentStatus} value={detailStatus(payment.status)} />
+        <DetailField label={t.verifiedAt} value={detailDate(payment.verifiedAt, dateLocale)} />
+      </dl>
+    </section>}
+    <section className="admin-detail-section admin-detail-section-quiet">
+      <h3>{t.system}</h3>
+      <dl className="admin-detail-grid">
+        <DetailField label={t.orderId} value={item.id} wide />
+        <DetailField label={t.createdAt} value={detailDate(item.createdAt, dateLocale)} />
+        <DetailField label={t.updatedAt} value={detailDate(item.updatedAt, dateLocale)} />
+      </dl>
+    </section>
+  </div>;
+}
+
+function PaymentDetails({ item, french }: { item: Row; french: boolean }) {
+  const payment = record(item.payment);
+  const customer = record(item.customer);
+  const dateLocale = french ? "fr-RW" : "en-RW";
+  const t = french ? {
+    payment: "Informations de paiement", reference: "Référence de paiement", method: "Mode de paiement",
+    amount: "Montant", status: "Statut du paiement", verifiedAt: "Vérifié le",
+    order: "Commande associée", orderReference: "Référence de commande", orderStatus: "Statut de la commande",
+    name: "Nom", phone: "Téléphone", email: "E-mail", createdAt: "Paiement créé le",
+    updatedAt: "Dernière mise à jour",
+  } : {
+    payment: "Payment information", reference: "Payment reference", method: "Payment method",
+    amount: "Payment amount", status: "Payment status", verifiedAt: "Verified at",
+    order: "Related order", orderReference: "Order reference", orderStatus: "Order status",
+    name: "Customer name", phone: "Phone", email: "Email", createdAt: "Payment created",
+    updatedAt: "Last updated",
+  };
+  return <div className="admin-order-details">
+    <section className="admin-detail-section">
+      <h3>{t.payment}</h3>
+      <dl className="admin-detail-grid">
+        <DetailField label={t.reference} value={payment.reference ?? item.paymentReference ?? payment.id} />
+        <DetailField label={t.method} value={detailStatus(payment.method)} />
+        <DetailField label={t.amount} value={payment.amount == null ? "" : detailMoney(payment.amount, dateLocale)} />
+        <DetailField label={t.status} value={detailStatus(payment.status)} />
+        <DetailField label={t.verifiedAt} value={detailDate(payment.verifiedAt, dateLocale)} />
+        <DetailField label={t.createdAt} value={detailDate(payment.createdAt ?? item.createdAt, dateLocale)} />
+        <DetailField label={t.updatedAt} value={detailDate(payment.updatedAt ?? item.updatedAt, dateLocale)} />
+      </dl>
+    </section>
+    <section className="admin-detail-section">
+      <h3>{t.order}</h3>
+      <dl className="admin-detail-grid">
+        <DetailField label={t.orderReference} value={item.reference ?? byPath(item, "order.reference")} />
+        <DetailField label={t.orderStatus} value={detailStatus(item.status ?? byPath(item, "order.status"))} />
+        <DetailField label={t.name} value={customer.name ?? item.customerName ?? byPath(item, "order.customerName")} />
+        <DetailField label={t.phone} value={customer.phone ?? item.customerPhone ?? byPath(item, "order.customerPhone")} />
+        <DetailField label={t.email} value={customer.email ?? item.customerEmail ?? byPath(item, "order.customerEmail")} />
+      </dl>
+    </section>
+  </div>;
+}
+
 function displayValue(value: unknown, key: string) {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") return value ? "Active" : "Inactive";
@@ -294,9 +445,9 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
         </div></td></tr>)}</tbody></table></div>}
     </section>
 
-    {editing && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor(); }}><section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-editor-title"><header><div><span className="admin-eyebrow">{resource.toUpperCase()}</span><h2 id="admin-editor-title">{conf.fields.length === 0 ? "Record details" : idOf(editing) ? "Edit record" : "Add new record"}</h2></div><button type="button" className="admin-icon-action" onClick={closeEditor} aria-label="Close editor"><X size={18} /></button></header>
+    {editing && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor(); }}><section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-editor-title"><header><div><span className="admin-eyebrow">{resource.toUpperCase()}</span><h2 id="admin-editor-title">{resource === "orders" ? (french ? "Détails de la commande" : "Order details") : resource === "payments" ? (french ? "Détails du paiement" : "Payment details") : conf.fields.length === 0 ? "Record details" : idOf(editing) ? "Edit record" : "Add new record"}</h2></div><button type="button" className="admin-icon-action" onClick={closeEditor} aria-label="Close editor"><X size={18} /></button></header>
       {(resource === "messages" || resource === "quotations" || resource === "bookings") && <section className="admin-request-preview"><h3>{resource === "messages" ? "Customer message" : resource === "quotations" ? "Quotation request details" : "Booking request details"}</h3><div><b>{String(byPath(editing, "customer.name") ?? editing.name ?? "Customer")}</b><span>{String(customerPhone(editing) || "Phone not supplied")}</span>{Boolean(editing.email ?? byPath(editing, "customer.email")) && <span>{String(editing.email ?? byPath(editing, "customer.email"))}</span>}</div><p>{String(editing.message ?? editing.details ?? editing.requirements ?? "No additional details provided.")}</p>{Boolean(editing.selection ?? editing.service ?? editing.serviceType) && <small>{String(editing.selection ?? editing.service ?? editing.serviceType)}</small>}</section>}
-      {conf.fields.length === 0 ? <div className="admin-record-details">{Object.entries(editing).filter(([key]) => !["__v"].includes(key)).map(([key, value]) => <div key={key}><b>{key}</b><pre>{typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "—")}</pre></div>)}</div> : <form onSubmit={save}><div className="admin-form-grid">{conf.fields.map((field) => <label key={field.key} className={`admin-form-field ${field.wide ? "wide" : ""} ${field.type === "checkbox" ? "checkbox-field" : ""}`}><span>{field.label}{field.required && <i> *</i>}</span>{field.key === "categoryId" ? <select value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}><option value="">Select a category</option>{categoryOptions.map((category) => <option key={idOf(category)} value={idOf(category)}>{String(category.nameEn ?? byPath(category, "name.en") ?? category.name ?? idOf(category))}</option>)}</select> : field.type === "textarea" ? <textarea rows={4} required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} /> : field.type === "select" ? <select required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}>{(field.options ?? []).map((option) => <option value={option} key={option}>{option}</option>)}</select> : field.type === "checkbox" ? <input type="checkbox" checked={values[field.key] === true} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.checked }))} /> : <input type={field.type ?? "text"} required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} />}</label>)}</div>
+      {resource === "orders" ? <OrderDetails item={editing} french={french} /> : resource === "payments" ? <PaymentDetails item={editing} french={french} /> : conf.fields.length === 0 ? <div className="admin-record-details">{Object.entries(editing).filter(([key]) => !["__v"].includes(key)).map(([key, value]) => <div key={key}><b>{key}</b><pre>{typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "—")}</pre></div>)}</div> : <form onSubmit={save}><div className="admin-form-grid">{conf.fields.map((field) => <label key={field.key} className={`admin-form-field ${field.wide ? "wide" : ""} ${field.type === "checkbox" ? "checkbox-field" : ""}`}><span>{field.label}{field.required && <i> *</i>}</span>{field.key === "categoryId" ? <select value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}><option value="">Select a category</option>{categoryOptions.map((category) => <option key={idOf(category)} value={idOf(category)}>{String(category.nameEn ?? byPath(category, "name.en") ?? category.name ?? idOf(category))}</option>)}</select> : field.type === "textarea" ? <textarea rows={4} required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} /> : field.type === "select" ? <select required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}>{(field.options ?? []).map((option) => <option value={option} key={option}>{option}</option>)}</select> : field.type === "checkbox" ? <input type="checkbox" checked={values[field.key] === true} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.checked }))} /> : <input type={field.type ?? "text"} required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} />}</label>)}</div>
         {resource === "products" && <section className="admin-image-manager"><div className="admin-image-manager-heading"><div><h3>Product photos</h3><p>Upload multiple images, drag order with the arrows, choose the cover and remove unwanted photos.</p></div><label className="button button-outline admin-upload-button"><ImagePlus size={15} />Add photos<input type="file" accept="image/*" multiple onChange={addImages} /></label></div>{images.length === 0 ? <div className="admin-image-empty"><ImagePlus size={19} />No product photos added yet.</div> : <div className="admin-image-grid">{images.map((image, index) => <div className={`admin-image-tile ${index === 0 ? "is-cover" : ""}`} key={image.key}><img src={image.src} alt={image.alt} /><span className="admin-image-index">{index === 0 ? "COVER" : `PHOTO ${index + 1}`}</span><div className="admin-image-actions"><button type="button" disabled={index === 0} aria-label="Move image earlier" onClick={() => moveImage(index, -1)}><ChevronLeft size={14} /></button><button type="button" disabled={index === images.length - 1} aria-label="Move image later" onClick={() => moveImage(index, 1)}><ChevronRight size={14} /></button><button type="button" title="Make cover image" aria-label="Make cover image" disabled={index === 0} onClick={() => moveImage(index, -index)}><Check size={14} /></button><button type="button" className="remove" aria-label="Remove image" onClick={() => { if (image.file) URL.revokeObjectURL(image.src); setImages((current) => current.filter((entry) => entry.key !== image.key)); }}><X size={14} /></button></div></div>)}</div>}</section>}
         {error && <div className="admin-alert admin-alert-error" role="alert">{error}</div>}<footer className="admin-modal-footer"><button type="button" className="button button-outline" onClick={closeEditor}>{french ? "Annuler" : "Cancel"}</button><button type="submit" className="button button-primary" disabled={saving}>{saving ? <><LoaderCircle className="admin-spin" size={15} />{french ? "Enregistrement…" : "Saving…"}</> : <><Check size={15} />{french ? "Enregistrer" : "Save changes"}</>}</button></footer></form>}
     </section></div>}
