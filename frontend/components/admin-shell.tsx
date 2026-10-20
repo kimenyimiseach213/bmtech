@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, ArrowLeft, Boxes, CalendarDays, ChevronDown, ClipboardList, FileText, FolderTree, LayoutDashboard, LogOut, Mail, MessageSquareText, Package, Settings, ShieldCheck, Star, Wallet, Zap } from "lucide-react";
+import { Activity, ArrowLeft, Bell, Boxes, CalendarDays, ChevronDown, ClipboardList, FileText, FolderTree, LayoutDashboard, LogOut, Mail, MessageSquareText, Package, Settings, ShieldCheck, Star, Wallet, Zap } from "lucide-react";
 import { LocaleLink as Link } from "@/components/locale-link";
 import { useStore } from "@/app/providers";
 import { apiPaths, apiRequest } from "@/lib/api";
@@ -29,6 +29,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { language, setLanguage, notify } = useStore();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  useEffect(() => { let live = true; const load = () => apiRequest<Record<string, number>>(apiPaths.dashboard).then((value) => { if (live) setSummary(value); }).catch(() => undefined); void load(); const timer = window.setInterval(load, 30000); return () => { live = false; window.clearInterval(timer); }; }, []);
+  const notificationCount = Object.values(summary).reduce((sum, value) => sum + (Number(value) || 0), 0);
   const locale = pathname.match(/^\/(en|fr)(?:\/|$)/)?.[1] ?? language;
   const french = locale === "fr";
 
@@ -55,7 +59,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="admin-sidebar-bottom"><span className="admin-secure-badge"><ShieldCheck size={14} />{french ? "Espace sécurisé" : "Secure workspace"}</span><Link href={`/${locale}`} className="admin-store-link"><Activity size={14} />{french ? "Voir le site public" : "View public storefront"}</Link></div>
     </aside>
     <div className="admin-main">
-      <header className="admin-topbar"><div><span className="admin-topbar-path">BMTECH / <b>{navigation.find((item) => item.key === activeSection)?.label ?? "Admin"}</b></span></div><div className="admin-topbar-actions"><Link href={`/${locale}`} className="admin-back-site"><ArrowLeft size={14} /><span>{french ? "Retour au site" : "Back to website"}</span></Link><label className="admin-locale-select"><span className="sr-only">Language</span><select value={locale} onChange={(event) => { const next = event.target.value as "en" | "fr"; setLanguage(next); router.push(pathname.replace(/^\/(en|fr)(?=\/|$)/, `/${next}`)); }}><option value="en">EN</option><option value="fr">FR</option></select><ChevronDown size={13} /></label><span className="admin-user-chip"><span className="admin-user-avatar">A</span><b>{french ? "Administrateur" : "Administrator"}</b></span><button type="button" className="admin-logout" onClick={logout} disabled={loggingOut}><LogOut size={15} />{loggingOut ? (french ? "Déconnexion…" : "Signing out…") : (french ? "Quitter" : "Sign out")}</button></div></header>
+      <header className="admin-topbar"><div><span className="admin-topbar-path">BMTECH / <b>{navigation.find((item) => item.key === activeSection)?.label ?? "Admin"}</b></span></div><div className="admin-topbar-actions"><div className="admin-notifications"><button type="button" className="admin-notification-button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((value) => !value)}><Bell size={17} />{notificationCount > 0 && <span>{notificationCount}</span>}</button>{notificationsOpen && <div className="admin-notification-menu"><strong>{french ? "Notifications" : "Notifications"}</strong><Link href={`/${locale}/admin/orders`} onClick={() => setNotificationsOpen(false)}><Package size={15} /><span>{summary.pendingOrders ?? 0} {french ? "nouvelles commandes" : "new orders"}</span></Link><Link href={`/${locale}/admin/messages`} onClick={() => setNotificationsOpen(false)}><Mail size={15} /><span>{summary.unreadMessages ?? 0} {french ? "messages non lus" : "unread messages"}</span></Link><Link href={`/${locale}/admin/quotations`} onClick={() => setNotificationsOpen(false)}><FileText size={15} /><span>{summary.openQuotations ?? 0} {french ? "demandes de devis" : "quote requests"}</span></Link><Link href={`/${locale}/admin/bookings`} onClick={() => setNotificationsOpen(false)}><CalendarDays size={15} /><span>{summary.pendingBookings ?? 0} {french ? "r�servations � traiter" : "bookings to review"}</span></Link></div>}</div><Link href={`/${locale}`} className="admin-back-site"><ArrowLeft size={14} /><span>{french ? "Retour au site" : "Back to website"}</span></Link><label className="admin-locale-select"><span className="sr-only">Language</span><select value={locale} onChange={(event) => { const next = event.target.value as "en" | "fr"; setLanguage(next); router.push(pathname.replace(/^\/(en|fr)(?=\/|$)/, `/${next}`)); }}><option value="en">EN</option><option value="fr">FR</option></select><ChevronDown size={13} /></label><span className="admin-user-chip"><span className="admin-user-avatar">A</span><b>{french ? "Administrateur" : "Administrator"}</b></span><button type="button" className="admin-logout" onClick={logout} disabled={loggingOut}><LogOut size={15} />{loggingOut ? (french ? "Déconnexion…" : "Signing out…") : (french ? "Quitter" : "Sign out")}</button></div></header>
       {children}
     </div>
   </div>;
