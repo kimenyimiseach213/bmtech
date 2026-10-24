@@ -10,6 +10,8 @@ The homepage keeps the hero and all existing service, business, gallery, review 
 2. Featured Power Equipment: the existing equipment-card actions and database-backed equipment listings.
 3. Products Undersale: published products explicitly classified with `isUndersale`, with the requested subtitle and View All Undersale Products link.
 
+The original generator and changeover galleries also need product records in the target database; deploying the frontend photo files alone does not create them. From `bmtech-backend`, run `node scripts/restore-equipment-catalog.cjs` to preview restoration and append `--apply` to restore missing entries. The script verifies all 18 original photos on the live frontend, creates the two enquiry-only equipment listings with their ordered galleries in one transaction, and leaves every existing product and category unchanged. Existing unpublished products are never republished by this command.
+
 Undersale does not imply a discount. No crossed-out prices or fictional production inventory were added. Old source-only Inverter/demo catalog entries were removed from the public defaults; existing database records were not deleted. Undersale records remain in the existing product table and use its image relationships.
 
 ## Public routes
