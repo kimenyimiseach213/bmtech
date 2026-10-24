@@ -300,3 +300,13 @@ button:disabled { cursor:not-allowed; opacity:.5; }
 @media(prefers-reduced-motion:reduce) { .shop-product-card,.shop-product-card * { transition:none!important; } }
 .admin-product-fieldset { border:0; padding:0; margin:0; min-width:0; }
 @media(max-width:600px) { .topbar-inner { min-height:38px; height:auto; gap:8px; padding-block:5px; } .topbar-inner>span { max-width:48%; white-space:normal; line-height:1.5; } .topbar-inner>span i { display:none; } .topbar-right { flex-shrink:0; } }
+
+.home-page .project-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; align-items:stretch; }
+.home-page .project-tile,.home-page .project-tile:first-child { height:auto; min-width:0; grid-row:auto; grid-column:auto; display:flex; flex-direction:column; color:var(--navy); background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 24px rgba(11,31,58,.07); }
+.home-page .project-tile::after { display:none; }
+.home-page .project-tile img { display:block; width:100%; height:auto; aspect-ratio:1.55; object-fit:cover; }
+.home-page .project-tile-copy { position:static; flex:1; padding:16px 18px 19px; }
+.home-page .project-tile-copy small { color:var(--blue); font-size:10px; letter-spacing:.08em; }
+.home-page .project-tile-copy h3 { color:var(--navy); font-size:16px; line-height:1.4; margin:7px 0 0; }
+@media(max-width:900px) { .home-page .project-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; } }
+@media(max-width:560px) { .home-page .project-grid { grid-template-columns:1fr; gap:14px; } .home-page .project-tile img { aspect-ratio:1.7; } .home-page .project-tile-copy { padding:14px 16px 16px; } }
