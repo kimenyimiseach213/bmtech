@@ -17,19 +17,30 @@ const { ceoNumber, selectionUrl, selectionMessage, validateSelection } = load('l
 const product = (slug, name, price) => ({ slug, name: { en: name, fr: name }, price, stock: 4 });
 test('CEO number is international digits only and missing or local values never invent a recipient', () => {
   assert.equal(ceoNumber('+999 (123) 45678'), '99912345678');
+  assert.equal(ceoNumber(undefined), '');
   for (const value of ['', '0788494513', 'abc12345678', '+012345678', '1234567890123456']) assert.equal(ceoNumber(value), '');
 });
 test('single product WhatsApp message identifies product, quantity, exact price, public URL and manual confirmation', () => {
-  const selection = { lines: [{ product: product('audio-amp', 'Audio & amplifier', 17500.25), quantity: 1 }], ceoWhatsapp: '+99912345678' };
+  const selection = { lines: [{ product: product('audio-amp', 'Audio & amplifier', 17500.25), quantity: 1 }], ceoWhatsapp: '+99912345678', whatsapp: '250788494513' };
   const url = new URL(selectionUrl(selection, 'en', 'https://store.example.invalid'));
   assert.equal(url.hostname, 'wa.me'); assert.equal(url.pathname, '/99912345678');
   const text = url.searchParams.get('text'); assert.match(text, /Product: Audio & amplifier/); assert.match(text, /Quantity: 1/); assert.match(text, /Unit price: 17,500.25 RWF/); assert.match(text, /Product link: https:\/\/store.example.invalid\/en\/products\/audio-amp/); assert.match(text, /Please confirm availability and payment instructions/);
+});
+test('CEO WhatsApp takes precedence over the configured business contact', () => {
+  const selection = { lines: [{ product: product('amp', 'Amplifier', 100), quantity: 1 }], ceoWhatsapp: '+99912345678', whatsapp: '250788494513' };
+  assert.equal(new URL(selectionUrl(selection, 'en', 'https://store.example.invalid')).pathname, '/99912345678');
+});
+test('business WhatsApp is the fallback when no valid CEO number is configured', () => {
+  const selection = { lines: [{ product: product('amp', 'Amplifier', 100), quantity: 1 }], ceoWhatsapp: '', whatsapp: '+250 788 494 513' };
+  assert.equal(new URL(selectionUrl(selection, 'en', 'https://store.example.invalid')).pathname, '/250788494513');
+  assert.equal(new URL(selectionUrl({ ...selection, whatsapp: undefined }, 'en', 'https://store.example.invalid', '250788494513')).pathname, '/250788494513');
+  assert.equal(selectionUrl({ ...selection, whatsapp: '' }, 'en', 'https://store.example.invalid'), '');
 });
 test('cart WhatsApp message contains every item, quantities, line totals and exact grand total', () => {
   const lines = [{ product: product('receiver', 'Receiver', 19500.25), quantity: 2 }, { product: product('headphones', 'Headphones', 18500.25), quantity: 1 }];
   const text = selectionMessage(lines, 'fr', 'https://store.example.invalid');
   assert.match(text, /Product: Receiver/); assert.match(text, /Quantity: 2/); assert.match(text, /Line total: 39,000.5 RWF/); assert.match(text, /Product: Headphones/); assert.match(text, /Total: 57,500.75 RWF/); assert.match(text, /\/fr\/products\/headphones/);
-  assert.equal(selectionUrl({ lines, ceoWhatsapp: '' }, 'en', 'https://store.example.invalid'), '');
+  assert.equal(selectionUrl({ lines, ceoWhatsapp: '', whatsapp: '' }, 'en', 'https://store.example.invalid'), '');
 });
 test('cart preparation always queries backend and explains price and stock changes', async () => {
   const originalFetch = global.fetch;
@@ -37,11 +48,11 @@ test('cart preparation always queries backend and explains price and stock chang
   global.fetch = async (url, init) => {
     called = true; assert.equal(url, '/api/backend/api/v1/cart/validate'); assert.equal(init.cache, 'no-store');
     assert.deepEqual(JSON.parse(init.body), { items: [{ productSlug: 'amp', quantity: 3 }] });
-    return new Response(JSON.stringify({ lines: [{ product: { slug: 'amp', nameEn: 'Amplifier', price: 18000.5, stockQuantity: 2 }, quantity: 2 }], changes: ['Quantity reduced to 2.'], ceoWhatsapp: '99912345678' }), { status: 201 });
+    return new Response(JSON.stringify({ lines: [{ product: { slug: 'amp', nameEn: 'Amplifier', price: 18000.5, stockQuantity: 2 }, quantity: 2 }], changes: ['Quantity reduced to 2.'], ceoWhatsapp: '99912345678', whatsapp: '250788494513' }), { status: 201 });
   };
   try {
     const result = await validateSelection([{ slug: 'amp', quantity: 3, unitPrice: 17500.25 }], []);
-    assert.equal(called, true); assert.equal(result.changes.length, 2); assert.match(result.changes[1], /17,500.25 RWF to 18,000.5 RWF/); assert.equal(result.lines[0].quantity, 2);
+    assert.equal(called, true); assert.equal(result.changes.length, 2); assert.match(result.changes[1], /17,500.25 RWF to 18,000.5 RWF/); assert.equal(result.lines[0].quantity, 2); assert.equal(result.whatsapp, '250788494513');
   } finally { global.fetch = originalFetch; }
 });
 test('backend validation failure stops preparation', async () => {

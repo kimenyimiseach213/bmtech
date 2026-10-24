@@ -11,15 +11,15 @@ export function OrderNow({ product, quantity = 1 }: { product: Product; quantity
   const [prepared, setPrepared] = useState<{ url: string; text: string } | null>(null);
   const available = product.price !== null && product.stock > 0 && product.isAvailable !== false;
   useEffect(() => { setPrepared(null); setError(""); }, [product.slug, product.price, product.stock, quantity]);
-  const configured = Boolean(ceoNumber(company.ceoWhatsapp));
+  const configured = Boolean(ceoNumber(company.ceoWhatsapp) || ceoNumber(company.whatsapp));
   async function order() {
     setBusy(true); setError(""); setPrepared(null);
     const popup = window.open("about:blank", "_blank");
     if (popup) popup.opener = null;
     try {
       const result = await validateSelection([{ slug: product.slug, quantity, unitPrice: product.price ?? undefined }], [product]);
-      const url = selectionUrl(result, language, window.location.origin);
-      if (!url) throw new Error(result.lines.length ? "WhatsApp ordering unavailable. BMTECH must configure the CEO WhatsApp Number in Admin Settings." : result.changes.join(" ") || "This product is unavailable.");
+      const url = selectionUrl(result, language, window.location.origin, company.whatsapp);
+      if (!url) throw new Error(result.lines.length ? "WhatsApp ordering unavailable. BMTECH must configure a valid WhatsApp contact in Admin Settings." : result.changes.join(" ") || "This product is unavailable.");
       if (result.changes.length) {
         popup?.close();
         setPrepared({ url: "", text: result.changes.join(" ") + " Refresh the product and review the changes before ordering." });
@@ -28,5 +28,5 @@ export function OrderNow({ product, quantity = 1 }: { product: Product; quantity
     } catch (reason) { popup?.close(); setError(reason instanceof Error ? reason.message : "Unable to validate this product."); }
     finally { setBusy(false); }
   }
-  return <div className="order-now"><button className="button button-primary" disabled={!available || !configured || busy} onClick={() => void order()}>{busy ? "Checking..." : "Order Now"}</button>{!configured && <small>WhatsApp ordering unavailable. CEO contact is not configured.</small>}{error && <small role="alert">{error}</small>}{prepared && <small role="status">{prepared.text} {prepared.url && <a href={prepared.url} target="_blank" rel="noreferrer">Open WhatsApp</a>}</small>}</div>;
+  return <div className="order-now"><button className="button button-primary" disabled={!available || !configured || busy} onClick={() => void order()}>{busy ? "Checking..." : "Order Now"}</button>{!configured && <small>WhatsApp ordering unavailable. Configure a BMTECH WhatsApp contact in Admin Settings.</small>}{error && <small role="alert">{error}</small>}{prepared && <small role="status">{prepared.text} {prepared.url && <a href={prepared.url} target="_blank" rel="noreferrer">Open WhatsApp</a>}</small>}</div>;
 }

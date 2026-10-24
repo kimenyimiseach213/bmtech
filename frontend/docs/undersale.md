@@ -51,7 +51,7 @@ Static `/images` paths bypass locale redirects. Product cards and the main galle
 ## Separate contact destinations
 
 - Existing business phone/email/general WhatsApp settings remain business inquiry contacts.
-- **Admin > Settings > Edit settings > CEO WhatsApp Number** controls product and cart ordering. Use a full international number including country code. A blank/invalid value disables ordering with a clear message. No number is copied from the business or developer contacts.
+- **Admin > Settings > Edit settings > CEO WhatsApp Number** is the preferred product and cart ordering recipient. If it is blank or invalid, ordering uses the configured BMTECH business WhatsApp contact instead. Both numbers must be valid international phone numbers; developer contact details are never used.
 - The footer displays **Website Designed & Developed by Kimenyi Miseach**, `kimenyimiseach9@gmail.com` (`mailto:`), `+250792031219` (`tel:`), and an explicitly labelled Developer Contact WhatsApp link. These values never feed order generation.
 
 ## Cart and ordering
@@ -104,8 +104,8 @@ Deploy this repository's frontend changes and the separate `bmtech-backend` chec
 | Route | Access / behavior |
 |---|---|
 | `GET /api/v1/products` and `/products/:slug` | Public; published products in active categories only, even if `status=all` is supplied |
-| `GET /api/v1/settings/public` | Public company settings and CEO ordering number |
-| `POST /api/v1/cart/validate` | Public; current server-side cart validation, no order/payment mutation |
+| `GET /api/v1/settings/public` | Public company settings, CEO ordering number, and business WhatsApp fallback |
+| `POST /api/v1/cart/validate` | Public; current server-side cart validation and ordering contact selection, no order/payment mutation |
 | `GET/POST /api/v1/admin/products` | Existing admin session guard; list/create |
 | `PATCH/DELETE /api/v1/admin/products/:id` | Existing admin session guard; edit/delete |
 | `POST /api/v1/admin/products/:id/images` | Guarded multi-photo upload |

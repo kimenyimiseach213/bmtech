@@ -2,7 +2,7 @@ const { spawn } = require("node:child_process");
 const path = require("node:path");
 
 const frontend = path.resolve(__dirname, "..");
-const backend = path.resolve(frontend, "..", "backend");
+const backend = path.resolve(frontend, "..", "bmtech-backend");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const children = [
   spawn(npm, ["run", "dev"], { cwd: backend, stdio: "inherit", shell: process.platform === "win32" }),
