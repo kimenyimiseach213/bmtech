@@ -1,17 +1,16 @@
 import type { Product, ProductCategory, ProductImage } from "@/types";
 
-function publicImageUrl(value: string): string {
-  if (!value || value.startsWith("data:") || value.startsWith("blob:")) return value;
+export function publicImageUrl(value: string): string {
+  if (!value || value.startsWith('blob:')) return value;
   try {
-    const currentOrigin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
-    const url = new URL(value, currentOrigin);
-    const localUploadUrl = ["localhost", "127.0.0.1"].includes(url.hostname) && url.pathname.startsWith("/uploads/");
-    if (!url.pathname.startsWith("/uploads/") || (url.origin !== currentOrigin && !localUploadUrl)) return value;
-    const base = process.env.NEXT_PUBLIC_BMTECH_API_ORIGIN || "";
-    return base ? new URL(`${url.pathname}${url.search}`, base.endsWith("/") ? base : `${base}/`).toString() : value;
-  } catch {
+    const url = new URL(value, 'https://bmtech.invalid');
+    if (!['https:', 'http:'].includes(url.protocol)) return '';
+    if (url.pathname.startsWith('/uploads/')) {
+      const file = decodeURIComponent(url.pathname.slice('/uploads/'.length));
+      return /^[a-zA-Z0-9_-]+\.(?:jpe?g|png|webp|gif)$/i.test(file) ? '/api/media/' + encodeURIComponent(file) : '';
+    }
     return value;
-  }
+  } catch { return ''; }
 }
 
 export class ApiError extends Error {
@@ -63,7 +62,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   }
   if (!response.ok) {
     const body = data && typeof data === "object" ? data as Record<string, unknown> : null;
-    const message = typeof body?.message === "string"
+    const message = Array.isArray(body?.message) ? body.message.join(" ") : typeof body?.message === "string"
       ? body.message
       : typeof body?.error === "string"
         ? body.error
@@ -135,15 +134,20 @@ export function normalizeProduct(payload: unknown): Product {
   const specsRaw = Array.isArray(item.specifications) ? item.specifications : Array.isArray(item.specs) ? item.specs : [];
   return {
     slug,
+    isUndersale: item.isUndersale === true,
+    shortDescription: textValue(item.shortDescription),
+    isAvailable: item.isAvailable !== false,
+    brand: textValue(item.brand),
     name: {
       en: nameEn,
       fr: nameFr,
     },
     category: textValue(categoryRecord.name, textValue(item.categoryName, textValue(item.category, "Products"))),
+    categorySlug: textValue(categoryRecord.slug),
     categoryFr: textValue(categoryRecord.nameFr, textValue(item.categoryNameFr, textValue(item.categoryName, "Produits"))),
     sku: textValue(item.sku) || undefined,
     model: textValue(item.model) || undefined,
-    condition: ["new", "used"].includes(textValue(item.condition).toLowerCase()) ? (textValue(item.condition).toLowerCase() === "new" ? "New" : "Used") : undefined,
+    condition: ["new", "used", "refurbished"].includes(textValue(item.condition).toLowerCase()) ? (textValue(item.condition).toLowerCase() === "new" ? "New" : textValue(item.condition).toLowerCase() === "used" ? "Used" : "Refurbished") : undefined,
     price,
     stock: numberValue(item.stockQuantity, numberValue(item.stock, 0)),
     availability: textValue(item.availability, numberValue(item.stockQuantity, numberValue(item.stock)) > 0 ? "Available" : "Ask BMTECH to confirm availability"),

@@ -7,12 +7,15 @@ import { imageUrls, services, whatsappLink } from "@/lib/data";
 import { FeatureItem, SectionHeading } from "@/components/ui";
 import { ProductGrid } from "@/components/products";
 import { PhotoCycler } from "@/components/photo-cycler";
+import { UndersaleSection } from "@/components/undersale-section";
+import { equipmentCategories, isPowerEquipment } from "@/lib/catalog";
 import { FAQ } from "@/components/faq";
 
 export default function HomePage() {
   const { language, products, categories, catalogError, catalogLoading, company } = useStore();
   const fr = language === "fr";
-  const featuredProducts = products.slice(0, 4);
+  const featuredProducts = products.filter(isPowerEquipment).slice(0, 4);
+  const powerCategories = equipmentCategories(categories);
   return <main className="home-page">
     <section className="hero hero-showcase">
       <div className="container hero-grid">
@@ -28,11 +31,11 @@ export default function HomePage() {
 
           <h1>POWER SOLUTIONS</h1>
           <p className="hero-kicker">FOR A BETTER TOMORROW</p>
-          <p className="hero-description">Sales, Installation, Repair and Maintenance of Generators, Inverters, Changeover Switches and Electrical Equipment.</p>
+          <p className="hero-description">Sales, Installation, Repair and Maintenance of Generators, Changeover Switches and Electrical Equipment.</p>
 
           <div className="hero-feature-chips">
             <span><BatteryCharging size={17} />Generators</span>
-            <span><Wrench size={17} />Inverters</span>
+            <span><Wrench size={17} />Electrical services</span>
             <span><Zap size={17} />Changeover Switches</span>
           </div>
 
@@ -59,9 +62,11 @@ export default function HomePage() {
 
     <section className="trust-strip"><div className="container trust-grid"><FeatureItem icon={ShieldCheck} title={fr ? "Équipement de qualité" : "Quality Power Equipment"} text={fr ? "Des options pour chaque besoin" : "Options for different needs"}/><FeatureItem icon={Wrench} title={fr ? "Installation professionnelle" : "Professional Installation"} text={fr ? "Évaluation selon le site" : "Site requirements considered"}/><FeatureItem icon={Cog} title={fr ? "Maintenance fiable" : "Reliable Maintenance"} text={fr ? "Support technique" : "Technical support enquiries"}/><FeatureItem icon={Truck} title={fr ? "Livraison gratuite*" : "Free Product Delivery*"} text={fr ? "À confirmer auprès de BMTECH" : "Confirm arrangements with BMTECH"}/></div></section>
 
-    <section className="section"><div className="container"><SectionHeading eyebrow={fr ? "NOS CATÉGORIES" : "POWER EQUIPMENT"} title={fr ? "Trouvez la bonne solution" : "Explore our equipment categories"} description={fr ? "Parcourez les équipements de production, de commutation et d'alimentation de secours." : "Browse generation, switching and backup power equipment for residential and commercial needs."} link={{ label: fr ? "Tous les produits" : "View all products", href: "/products" }}/><div className="category-grid">{categories.map((category, i) => <Link href={`/products?category=${encodeURIComponent(category.name)}`} className="category-card" key={category.name}><PhotoCycler className="category-photo-cycler" images={category.images} fit="cover" interval={4200}/><div className="category-card-content"><span>0{i+1} · EQUIPMENT</span><h3>{fr ? category.nameFr : category.name}</h3><p>{category.summary}</p><span className="text-link">{fr ? "Explorer la catégorie" : "Explore category"}<ArrowRight size={14}/></span></div></Link>)}</div></div></section>
+    <section className="section"><div className="container"><SectionHeading eyebrow={fr ? "NOS CATÉGORIES" : "POWER EQUIPMENT"} title={fr ? "Trouvez la bonne solution" : "Explore Our Equipment Categories"} description={fr ? "Parcourez les équipements de production, de commutation et d'alimentation de secours." : "Browse generation, switching and backup power equipment for residential and commercial needs."} link={{ label: fr ? "Tous les produits" : "View all products", href: "/products" }}/><div className="category-grid">{powerCategories.map((category, i) => <Link href={`/products?category=${encodeURIComponent(category.name)}`} className="category-card" key={category.name}><PhotoCycler className="category-photo-cycler" images={category.images} fit="cover" interval={4200}/><div className="category-card-content"><span>0{i+1} · EQUIPMENT</span><h3>{fr ? category.nameFr : category.name}</h3><p>{category.summary}</p><span className="text-link">{fr ? "Explorer la catégorie" : "Explore category"}<ArrowRight size={14}/></span></div></Link>)}</div></div></section>
 
-    <section className="section section-mist"><div className="container"><SectionHeading eyebrow={fr ? "SÉLECTION" : "SELECTED PRODUCTS"} title={fr ? "Équipements présentés" : "Featured power equipment"} description={fr ? "Parcourez les équipements BMTECH publiés. Confirmez le prix, les caractéristiques et la disponibilité avant commande." : "Browse BMTECH’s published equipment. Confirm pricing, specifications, and availability before placing an order."} link={{ label: fr ? "Parcourir le catalogue" : "Browse catalogue", href: "/products" }}/><ProductGrid items={featuredProducts}/>{catalogLoading && <p className="catalog-live-note">{fr ? "Chargement du catalogue publié…" : "Loading the published catalogue…"}</p>}{catalogError && <p className="catalog-live-note">{fr ? "Le catalogue de prévisualisation est affiché car l’API du catalogue n’est pas disponible." : "Preview products are shown while the live catalogue API is unavailable."}</p>}{(catalogError || catalogLoading) && <p className="catalog-disclaimer">{fr ? "Les prix et les détails de ces exemples ne constituent pas un devis BMTECH." : "Preview product details and prices are not a BMTECH quote."}</p>}</div></section>
+    <section className="section section-mist"><div className="container"><SectionHeading eyebrow={fr ? "SÉLECTION" : "SELECTED PRODUCTS"} title={fr ? "Équipements présentés" : "Featured Power Equipment"} description={fr ? "Parcourez les équipements BMTECH publiés. Confirmez le prix, les caractéristiques et la disponibilité avant commande." : "Browse BMTECH’s published equipment. Confirm pricing, specifications, and availability before placing an order."} link={{ label: fr ? "Parcourir le catalogue" : "Browse catalogue", href: "/products" }}/><ProductGrid items={featuredProducts} variant="equipment"/>{catalogLoading && <p className="catalog-live-note">{fr ? "Chargement du catalogue publié…" : "Loading the published catalogue…"}</p>}{catalogError && <p className="catalog-live-note">{fr ? "Le catalogue de prévisualisation est affiché car l’API du catalogue n’est pas disponible." : "The live equipment catalog could not be loaded. Please try again."}</p>}{(catalogError || catalogLoading) && <p className="catalog-disclaimer">{fr ? "Les prix et les détails de ces exemples ne constituent pas un devis BMTECH." : "Contact BMTech to confirm equipment requirements and availability."}</p>}</div></section>
+
+    <UndersaleSection/>
 
     <section className="section"><div className="container"><SectionHeading eyebrow={fr ? "SERVICES" : "HOW WE CAN HELP"} title={fr ? "Un soutien au-delà des produits" : "Support beyond the equipment"} description={fr ? "Des demandes d'installation et de maintenance peuvent être soumises pour étude." : "Send an enquiry about installation, servicing and electrical work for review."} link={{ label: fr ? "Voir les services" : "Explore services", href: "/services" }}/><div className="service-grid">{services.slice(0, 6).map((service, i) => {const icons=[Zap,Wrench,BatteryCharging,ClipboardCheck,Headphones,Cog];const Icon=icons[i];return <article className="service-card" key={service.title}><span className="service-icon"><Icon size={19}/></span><h3>{fr ? service.titleFr : service.title}</h3><p>{service.description}</p><Link className="text-link" href="/services">{fr ? "En savoir plus" : "Learn more"}<ArrowRight size={13}/></Link></article>;})}</div></div></section>
 

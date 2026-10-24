@@ -8,7 +8,8 @@
     "build": "node scripts/next-cli.cjs build",
     "start": "node scripts/next-cli.cjs start --port 3002",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:undersale": "node --test scripts/test-undersale.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

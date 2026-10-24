@@ -16,7 +16,7 @@ export function Breadcrumbs({ items }: { items: Array<{ label: string; href?: st
 }
 
 export function PriceDisplay({ amount, small = false }: { amount: number | null; small?: boolean }) {
-  return amount === null ? <span className={`price-quote ${small ? "small" : ""}`}>Request a quote</span> : <span className={`price-value ${small ? "small" : ""}`}>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(amount)} <small>RWF</small></span>;
+  return amount === null ? <span className={`price-quote ${small ? "small" : ""}`}>Request a quote</span> : <span className={`price-value ${small ? "small" : ""}`}>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 2 }).format(amount)} <small>RWF</small></span>;
 }
 
 export function StatusBadge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "green" | "amber" | "blue" }) { return <span className={`status-badge status-${tone}`}><i />{children}</span>; }

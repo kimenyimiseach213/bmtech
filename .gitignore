@@ -9,3 +9,5 @@ backend/uploads/
 !.env.example
 !**/.env.example
 .DS_Store
+
+.next-undersale-preview/

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, ArrowLeft, Bell, Boxes, CalendarDays, ChevronDown, ClipboardList, FileText, FolderTree, LayoutDashboard, LogOut, Mail, MessageSquareText, Package, Settings, ShieldCheck, Star, Wallet, Zap } from "lucide-react";
+import { Activity, ShoppingBag, ArrowLeft, Bell, Boxes, CalendarDays, ChevronDown, ClipboardList, FileText, FolderTree, LayoutDashboard, LogOut, Mail, MessageSquareText, Package, Settings, ShieldCheck, Star, Wallet, Zap } from "lucide-react";
 import { LocaleLink as Link } from "@/components/locale-link";
 import { useStore } from "@/app/providers";
 import { apiPaths, apiRequest } from "@/lib/api";
@@ -10,6 +10,7 @@ import { apiPaths, apiRequest } from "@/lib/api";
 const navigation = [
   { key: "dashboard", label: "Overview", icon: LayoutDashboard },
   { key: "products", label: "Products & inventory", icon: Boxes },
+  { key: "undersale", label: "Undersale", icon: ShoppingBag },
   { key: "categories", label: "Categories", icon: FolderTree },
   { key: "orders", label: "Orders", icon: Package },
   { key: "payments", label: "Payments", icon: Wallet },

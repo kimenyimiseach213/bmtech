@@ -51,7 +51,6 @@ export const serviceImages: ProductImage[] = [
 export const categories = [
   { name: "Generators", nameFr: "Groupes électrogènes", image: generatorImages[0].src, images: generatorImages, summary: "Browse generator photos and ask BMTECH to confirm models, ratings, availability and prices." },
   { name: "Changeover Switches", nameFr: "Inverseurs de source", image: changeoverImages[0].src, images: changeoverImages, summary: "Browse switch photos and ask BMTECH to confirm models, ratings, availability and prices." },
-  { name: "Inverters & Backup", nameFr: "Onduleurs et secours", image: imageUrls.inverter, images: [{src: imageUrls.inverter, alt: "Inverter and backup power equipment"}], summary: "Battery and inverter systems for essential loads." },
 ];
 
 export const products: Product[] = [
@@ -65,21 +64,7 @@ export const products: Product[] = [
     description: { en: "Browse the changeover switch photos supplied for this catalogue. Contact BMTECH to confirm the exact model, electrical rating, availability and price before purchase.", fr: "Parcourez les photos d'inverseurs de source fournies pour ce catalogue. Contactez BMTECH pour confirmer le modèle exact, le calibre, la disponibilité et le prix avant tout achat." },
     specs: [{ label: "Models", value: "Several switch styles shown; confirm the exact model" }, { label: "Electrical rating", value: "Confirm the rating for the selected model" }, { label: "Availability and price", value: "Contact BMTECH for current details" }], installation: true, demo: false,
   },
-  {
-    slug: "pure-sine-inverter-5kva", name: { en: "Pure Sine Inverter · 5 kVA", fr: "Onduleur sinusoïdal · 5 kVA" }, category: "Inverters & Backup", categoryFr: "Onduleurs et secours", sku: "DEMO-INV-005", model: "BM demo range", condition: "New", price: 1250000, stock: 5, availability: "Available to enquire", image: imageUrls.inverter,
-    description: { en: "A sample inverter category product for essential backup loads. Battery requirements depend on the intended runtime and load profile.", fr: "Un produit indicatif pour l'alimentation de secours des charges essentielles. Les batteries nécessaires dépendent de l'autonomie et des charges." },
-    specs: [{ label: "Output", value: "5 kVA (demo specification)" }, { label: "Waveform", value: "Pure sine (illustrative)" }, { label: "Battery", value: "Configuration to assess" }], installation: true, demo: true,
-  },
-  {
-    slug: "backup-battery-system", name: { en: "Backup Battery System", fr: "Système de batteries de secours" }, category: "Inverters & Backup", categoryFr: "Onduleurs et secours", sku: "DEMO-BAT-001", model: "Configuration dependent", condition: "New", price: null, stock: 0, availability: "Request availability", image: imageUrls.solar,
-    description: { en: "Battery capacity, chemistry and inverter matching should be selected around your expected loads and backup duration.", fr: "La capacité, la technologie et la compatibilité des batteries doivent être définies selon vos charges et l'autonomie souhaitée." },
-    specs: [{ label: "Capacity", value: "To be specified" }, { label: "Chemistry", value: "To be specified" }, { label: "Compatibility", value: "Assessment required" }], installation: true, demo: true,
-  },
-  {
-    slug: "distribution-panel", name: { en: "Distribution Panel Assembly", fr: "Tableau de distribution" }, category: "Electrical Equipment", categoryFr: "Équipement électrique", sku: "DEMO-PNL-001", model: "Configuration dependent", condition: "Used", price: 680000, stock: 2, availability: "Condition to confirm", image: imageUrls.technician,
-    description: { en: "Illustrative listing for electrical distribution equipment. Used condition and suitability must be inspected and confirmed before supply.", fr: "Exemple de matériel de distribution électrique. L'état et l'adéquation doivent être inspectés et confirmés avant fourniture." },
-    specs: [{ label: "Type", value: "Distribution panel" }, { label: "Condition", value: "Used (demo listing)" }, { label: "Suitability", value: "Inspection required" }], installation: true, demo: true,
-  },
+
 ];
 
 export const services = [
@@ -100,7 +85,7 @@ export const faqItems = [
   { q: "Is a technician booking confirmed when I submit the form?", a: "No. The form demonstrates a request only. A booking is not confirmed until BMTECH confirms the appointment." },
 ];
 
-export const formatRwf = (amount: number) => new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(amount) + " RWF";
+export const formatRwf = (amount: number) => new Intl.NumberFormat("en-RW", { maximumFractionDigits: 2 }).format(amount) + " RWF";
 
 export const whatsappLink = (message = "Hello BMTECH, I would like to ask about your power solutions.", phone = whatsappNumber) => {
   let normalizedPhone = phone.replace(/\D/g, "");

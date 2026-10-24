@@ -3,7 +3,7 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronLeft, ChevronRight, ExternalLink, Eye, FilePlus2, ImagePlus, LoaderCircle, MessageCircle, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, X } from "lucide-react";
 import { useStore } from "@/app/providers";
-import { apiPaths, apiRequest, unwrapList } from "@/lib/api";
+import { ApiError, apiPaths, apiRequest, publicImageUrl, unwrapList } from "@/lib/api";
 
 type ResourceKey = "products" | "categories" | "orders" | "payments" | "quotations" | "bookings" | "messages" | "reviews" | "settings";
 type Row = Record<string, unknown>;
@@ -12,10 +12,10 @@ type ImageDraft = { key: string; id?: string; src: string; file?: File; alt: str
 
 const config: Record<ResourceKey, { title: string; subtitle: string; endpoint: string; fields: Field[]; columns: Array<{ key: string; label: string }> }> = {
   products: { title: "Products & inventory", subtitle: "Manage bilingual product details, pricing, stock and product photography.", endpoint: "products", fields: [
-    { key: "sku", label: "SKU" }, { key: "categoryId", label: "Category ID" }, { key: "brand", label: "Brand" }, { key: "model", label: "Model" },
+    { key: "isUndersale", label: "Undersale (Electronics)", type: "checkbox" }, { key: "shortDescription", label: "Short description (up to 500 characters)", type: "textarea", wide: true }, { key: "specifications", label: "Specifications (one Label: Value per line)", type: "textarea", wide: true }, { key: "isAvailable", label: "Available for purchase", type: "checkbox" }, { key: "sku", label: "SKU" }, { key: "categoryId", label: "Category ID" }, { key: "brand", label: "Brand" }, { key: "model", label: "Model" },
     { key: "nameEn", label: "Name (English)", required: true }, { key: "nameFr", label: "Name (French)", required: true },
     { key: "descriptionEn", label: "Description (English)", type: "textarea", wide: true }, { key: "descriptionFr", label: "Description (French)", type: "textarea", wide: true },
-    { key: "condition", label: "Condition", type: "select", options: ["NEW", "USED"] }, { key: "priceMode", label: "Price mode", type: "select", options: ["FIXED", "QUOTE_REQUIRED"] },
+    { key: "condition", label: "Condition", type: "select", options: ["NEW", "USED", "REFURBISHED"] }, { key: "priceMode", label: "Price mode", type: "select", options: ["FIXED", "QUOTE_REQUIRED"] },
     { key: "price", label: "Price (RWF)", type: "number" }, { key: "stockQuantity", label: "Stock quantity", type: "number" }, { key: "installationAvailable", label: "Installation available", type: "checkbox" }, { key: "isPublished", label: "Published on storefront", type: "checkbox" },
   ], columns: [{ key: "nameEn", label: "Product" }, { key: "sku", label: "SKU" }, { key: "category", label: "Category" }, { key: "stockQuantity", label: "Stock" }, { key: "price", label: "Price" }, { key: "status", label: "Status" }] },
   categories: { title: "Categories", subtitle: "Create and organize active storefront categories in English and French.", endpoint: "categories", fields: [
@@ -40,7 +40,7 @@ const config: Record<ResourceKey, { title: string; subtitle: string; endpoint: s
     { key: "status", label: "Status", type: "select", options: ["PENDING", "APPROVED", "HIDDEN"] }, { key: "adminNotes", label: "Moderation notes", type: "textarea", wide: true },
   ], columns: [{ key: "name", label: "Customer" }, { key: "rating", label: "Rating" }, { key: "experience", label: "Review" }, { key: "createdAt", label: "Submitted" }, { key: "status", label: "Status" }] },
   settings: { title: "Company settings", subtitle: "Maintain the public company profile. The public email also receives new customer enquiries when SMTP is configured.", endpoint: "settings", fields: [
-    { key: "companyName", label: "Company name" }, { key: "phone", label: "Public phone", type: "tel" }, { key: "whatsapp", label: "WhatsApp number", type: "tel" }, { key: "email", label: "Public email and enquiry inbox", type: "email" },
+    { key: "companyName", label: "Company name" }, { key: "phone", label: "Public phone", type: "tel" }, { key: "whatsapp", label: "WhatsApp number", type: "tel" }, { key: "ceoWhatsapp", label: "CEO WhatsApp Number (international, include country code)", type: "tel" }, { key: "email", label: "Public email and enquiry inbox", type: "email" },
     { key: "businessHours", label: "Business hours", type: "textarea", wide: true }, { key: "aboutEn", label: "Company information (English)", type: "textarea", wide: true }, { key: "aboutFr", label: "Company information (French)", type: "textarea", wide: true },
   ], columns: [{ key: "companyName", label: "Company" }, { key: "phone", label: "Phone" }, { key: "whatsapp", label: "WhatsApp" }, { key: "email", label: "Email" }] },
 };
@@ -64,7 +64,7 @@ function detailStatus(value: unknown): string {
 }
 function detailMoney(value: unknown, locale: string): string {
   const amount = Number(value);
-  return Number.isFinite(amount) ? `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(amount)} RWF` : detailText(value);
+  return Number.isFinite(amount) ? `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(amount)} RWF` : detailText(value);
 }
 
 function DetailField({ label, value, wide = false }: { label: string; value: unknown; wide?: boolean }) {
@@ -204,7 +204,7 @@ function displayValue(value: unknown, key: string) {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") return value ? "Active" : "Inactive";
   if (typeof value === "object") return String(record(value).name ?? record(value).reference ?? record(value).id ?? "—");
-  if (key.toLowerCase().includes("price") || key === "amount" || key === "total" || key === "quotedAmount") return `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(Number(value) || 0)} RWF`;
+  if (key.toLowerCase().includes("price") || key === "amount" || key === "total" || key === "quotedAmount") return `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 2 }).format(Number(value) || 0)} RWF`;
   return String(value);
 }
 function idOf(item: Row) { return String(item.id ?? item._id ?? item.slug ?? item.reference ?? ""); }
@@ -222,7 +222,7 @@ function imageRows(item: Row): ImageDraft[] {
   const images: ImageDraft[] = [];
   item.images.forEach((entry, index) => {
     const image = record(entry);
-    const src = String(image.url ?? image.src ?? image.path ?? "");
+    const src = publicImageUrl(String(image.url ?? image.src ?? image.path ?? ""));
     if (src) images.push({ key: String(image.id ?? `existing-${index}`), id: image.id ? String(image.id) : undefined, src, alt: String(image.alt ?? `Product photo ${index + 1}`) });
   });
   return images;
@@ -236,9 +236,9 @@ function waHref(phone: string, message: string) {
   return `https://wa.me/${recipient}?text=${encodeURIComponent(message)}`;
 }
 
-export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
+export function AdminResourcePage({ resource, undersale = false }: { resource: ResourceKey; undersale?: boolean }) {
   const conf = config[resource];
-  const { language, notify } = useStore();
+  const { language, notify, refreshCatalog } = useStore();
   const french = language === "fr";
   const [rows, setRows] = useState<Row[]>([]);
   const [categoryOptions, setCategoryOptions] = useState<Row[]>([]);
@@ -278,6 +278,7 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
   }, [resource]);
 
   const visibleRows = useMemo(() => rows.filter((row) => {
+    if (undersale && row.isUndersale !== true) return false;
     const searchable = conf.columns.map(({ key }) => String(columnValue(row, key) ?? "")).join(" ").toLowerCase();
     const matchesQuery = !query.trim() || searchable.includes(query.trim().toLowerCase());
     const status = String(row.status ?? (row.isActive === true ? "active" : row.isActive === false ? "inactive" : "all")).toLowerCase();
@@ -286,7 +287,7 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
     return matchesQuery && (statusFilter === "all" || status === statusFilter.toLowerCase())
       && (resource !== "products" || productCategoryFilter === "all" || categoryId === productCategoryFilter)
       && (resource !== "products" || productConditionFilter === "all" || condition === productConditionFilter);
-  }), [rows, query, statusFilter, conf.columns, resource, productCategoryFilter, productConditionFilter]);
+  }), [rows, query, statusFilter, conf.columns, resource, productCategoryFilter, productConditionFilter, undersale]);
 
   function openEditor(item: Row | null) {
     setEditing(item ?? {});
@@ -294,12 +295,15 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
     const next: Record<string, string | boolean> = {};
     for (const field of conf.fields) {
       let value = item ? fieldValue(item, field.key) : undefined;
+      if (field.key === "specifications" && Array.isArray(value)) value = value.map((s) => `${record(s).label}: ${record(s).value}`).join("\n");
+      if (!item && field.key === "isUndersale") value = undersale;
+      if (!item && field.key === "isAvailable") value = true;
       if (field.key === "status" && typeof value === "string") value = value.toUpperCase();
       if (field.type === "datetime-local" && typeof value === "string" && value.includes("T")) value = value.slice(0, 16);
       if (value === undefined && !item && resource === "products" && field.key === "condition") value = "NEW";
       if (value === undefined && !item && resource === "products" && field.key === "priceMode") value = "FIXED";
       if (value === undefined && !item && resource === "products" && field.key === "stockQuantity") value = "0";
-      if (value === undefined && !item && resource === "products" && field.key === "isPublished") value = true;
+      if (value === undefined && !item && resource === "products" && field.key === "isPublished") value = false;
       if (value === undefined && !item && resource === "categories" && field.key === "isActive") value = true;
       if (value === undefined && !item && resource === "categories" && field.key === "sortOrder") value = String(rows.length);
       if (value === undefined && !item && field.key === "status") value = resource === "quotations" ? "OPEN" : resource === "bookings" ? "PENDING" : resource === "messages" ? "UNREAD" : "PENDING";
@@ -315,7 +319,8 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
   }
 
   function addImages(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
+    const files = Array.from(event.target.files ?? []);
+    if (images.length + files.length > 12 || files.some(file => !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) || file.size > 4000000)) { setError("Select up to 12 JPEG, PNG, WebP or GIF photos, each up to 4 MB."); event.target.value = ""; return; }
     setImages((current) => [...current, ...files.map((file) => ({ key: `new-${crypto.randomUUID()}`, src: URL.createObjectURL(file), file, alt: file.name }))]);
     event.target.value = "";
   }
@@ -330,7 +335,12 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
 
   async function saveImages(productId: string) {
     const deleted = imageRows(editing ?? {}).filter((old) => !images.some((image) => image.key === old.key));
-    for (const image of deleted) if (image.id) await apiRequest(`${apiPaths.admin(`products/${encodeURIComponent(productId)}/images/${encodeURIComponent(image.id)}`)}`, { method: "DELETE" });
+    for (const image of deleted) if (image.id) {
+      try { await apiRequest(apiPaths.admin('products/' + encodeURIComponent(productId) + '/images/' + encodeURIComponent(image.id)), { method: 'DELETE' }); }
+      catch (reason) { if (!(reason instanceof ApiError && reason.status === 404)) throw reason; }
+      setEditing(current => current ? { ...current, images: Array.isArray(current.images) ? current.images.filter(old => record(old).id !== image.id) : [] } : current);
+    }
+    setEditing(current => current ? { ...current, images: Array.isArray(current.images) ? current.images.filter(old => !deleted.some(image => image.id === record(old).id)) : [] } : current);
     const newImages = images.filter((image) => image.file);
     let uploaded: ImageDraft[] = [];
     if (newImages.length) {
@@ -344,10 +354,16 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
         const savedImages = serverImages.map(record);
         if (savedImages.some((image) => !image.id)) throw new Error("The backend uploaded the photo but did not return every saved image ID.");
         savedImages.forEach((image, savedIndex) => uploaded.push({
-          key: savedImages.length === newImages.length ? newImages[savedIndex].key : source.key,
-          id: String(image.id), src: String(image.url ?? image.src ?? source.src ?? ""),
+          key: source.key,
+          id: String(image.id), src: publicImageUrl(String(image.url ?? image.src ?? source.src ?? "")),
           alt: String(image.alt ?? source.alt ?? "Product photo"),
         }));
+        const savedDraft = uploaded.find(image => image.key === source.key);
+        if (savedDraft) {
+          setImages(current => current.map(image => image.key === source.key ? savedDraft : image));
+          setEditing(current => ({ ...current, images: [...(Array.isArray(current?.images) ? current.images : []), ...savedImages] }));
+          URL.revokeObjectURL(source.src);
+        }
       }
     }
     const merged = images.map((image) => image.file ? uploaded.find((uploadedImage) => uploadedImage.key === image.key) ?? image : image);
@@ -371,19 +387,26 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
       if (field.type === "checkbox") body[field.key] = values[field.key] === true;
     }
     if (resource === "products") {
-      body.name = { en: values.nameEn ?? "", fr: values.nameFr ?? "" };
+      body.specifications = String(values.specifications || "").split("\n").filter(line => line.trim()).map(line => { const i = line.indexOf(":"); return { label: i < 0 ? line.trim() : line.slice(0, i).trim(), value: i < 0 ? "" : line.slice(i + 1).trim() }; });
+      if (undersale) { body.isUndersale = true; body.priceMode = "FIXED"; }
+      if (body.isUndersale === true && !String(values.nameFr || "").trim()) body.nameFr = values.nameEn;
+      body.name = { en: values.nameEn ?? "", fr: body.nameFr || "" };
       body.description = { en: values.descriptionEn ?? "", fr: values.descriptionFr ?? "" };
       if (String(values.priceMode).toUpperCase().includes("QUOTE")) body.price = null;
     }
     if (resource === "categories") body.name = { en: values.nameEn ?? "", fr: values.nameFr ?? "" };
+    const saleProduct = resource === 'products' && body.isUndersale === true;
+    const publishAfterPhotos = saleProduct && body.isPublished === true;
+    if (saleProduct && publishAfterPhotos && !images.length) { setSaving(false); setError('Add at least one product photo before publishing.'); return; }
+    if (saleProduct) body.isPublished = false;
     const entityId = idOf(editing);
     const path = resource === "settings" ? apiPaths.admin("settings") : apiPaths.admin(`${conf.endpoint}${isUpdate ? `/${encodeURIComponent(entityId)}` : ""}`);
     try {
       const response = await apiRequest<unknown>(path, { method: isUpdate || resource === "settings" ? "PATCH" : "POST", body: JSON.stringify(body) });
       const saved = record(response); const nested = record(saved.data); const savedId = String(saved.id ?? saved.slug ?? nested.id ?? nested.slug ?? entityId);
-      if (resource === "products" && savedId && images.length >= 0) await saveImages(savedId);
+      if (resource === "products" && savedId) { setEditing(current => ({ ...current, id: savedId })); await saveImages(savedId); if (publishAfterPhotos) await apiRequest(apiPaths.admin(`products/${encodeURIComponent(savedId)}`), { method: "PATCH", body: JSON.stringify({ isPublished: true }) }); }
       notify(french ? "Modifications enregistrées." : "Changes saved.");
-      closeEditor(); await load();
+      closeEditor(); refreshCatalog(); await load();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The change could not be saved.");
     } finally { setSaving(false); }
@@ -394,9 +417,9 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
     if (!itemId) { setError("The API record has no id, slug or reference to update."); return; }
     setError("");
     try {
-      const body = resource === "categories" ? { isActive: status === "ACTIVE" } : { status };
+      const body = resource === "products" ? { isPublished: status === "PUBLISHED" } : resource === "categories" ? { isActive: status === "ACTIVE" } : { status };
       await apiRequest(apiPaths.admin(`${conf.endpoint}/${encodeURIComponent(itemId)}`), { method: "PATCH", body: JSON.stringify(body) });
-      notify(french ? "Statut mis à jour." : "Status updated."); await load();
+      notify(french ? "Statut mis à jour." : "Status updated."); refreshCatalog(); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Status update failed."); }
   }
 
@@ -418,17 +441,31 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
     if (!itemId) { setError("The API record has no identifier to remove."); return; }
     try {
       await apiRequest(apiPaths.admin(`${conf.endpoint}/${encodeURIComponent(itemId)}`), { method: "DELETE" });
-      notify(french ? "Élément supprimé." : "Record deleted."); await load();
+      notify(french ? "Élément supprimé." : "Record deleted."); refreshCatalog(); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Delete failed."); }
   }
 
-  const title = french ? ({ products: "Produits et stock", categories: "Catégories", orders: "Commandes", payments: "Paiements", quotations: "Demandes de devis", bookings: "Rendez-vous techniciens", messages: "Messages clients", reviews: "Modération des avis", settings: "Paramètres de l’entreprise" } as Record<ResourceKey, string>)[resource] : conf.title;
+  const saleFieldOrder = ['nameEn', 'shortDescription', 'descriptionEn', 'price', 'brand', 'model', 'specifications', 'condition', 'stockQuantity', 'isAvailable', 'isPublished', 'nameFr', 'descriptionFr', 'sku', 'installationAvailable'];
+  const editorFields = conf.fields.filter(field => !undersale || !['isUndersale', 'categoryId', 'priceMode'].includes(field.key)).sort((a,b) => undersale ? saleFieldOrder.indexOf(a.key) - saleFieldOrder.indexOf(b.key) : 0).map(field => !undersale ? field : {
+    ...field,
+    label: ({ nameEn: 'Product name', nameFr: 'Product name (French, optional)', descriptionEn: 'Full description', descriptionFr: 'Full description (French, optional)' } as Record<string,string>)[field.key] || field.label,
+    required: field.key === 'nameFr' ? false : ['nameEn', 'shortDescription', 'descriptionEn', 'price', 'stockQuantity'].includes(field.key) || field.required,
+  });
+  const title = undersale ? "Undersale" : french ? ({ products: "Produits et stock", categories: "Catégories", orders: "Commandes", payments: "Paiements", quotations: "Demandes de devis", bookings: "Rendez-vous techniciens", messages: "Messages clients", reviews: "Modération des avis", settings: "Paramètres de l’entreprise" } as Record<ResourceKey, string>)[resource] : conf.title;
 
   return <main className="admin-content">
     <div className="admin-title-row"><div><span className="admin-eyebrow">BMTECH ADMIN</span><h1>{title}</h1><p>{french ? "Gérez les informations enregistrées par le serveur." : conf.subtitle}</p></div><div className="admin-title-actions">{((resource === "products" || resource === "categories") || (resource === "settings" && rows.length > 0)) && <button className="button button-primary" type="button" onClick={() => openEditor(resource === "settings" ? rows[0] ?? null : null)}><Plus size={15} />{french ? "Ajouter" : resource === "products" ? "Add product" : resource === "settings" ? "Edit settings" : "Add new"}</button>}{resource === "settings" && rows.length === 0 && !loading && <button className="button button-primary" type="button" onClick={() => openEditor(null)}><Pencil size={15} />Edit company settings</button>}<button className="button button-outline admin-refresh" type="button" onClick={() => void load()} disabled={loading}><RefreshCw size={14} className={loading ? "admin-spin" : ""} />{french ? "Actualiser" : "Refresh"}</button></div></div>
+    {undersale && <div className="catalog-api-notice">Add a product, upload its photos, set price and stock, then publish. Published products appear automatically on the homepage and Products Undersale page. Configure the CEO WhatsApp Number in Settings.</div>}
+    {undersale && <div className="undersale-admin-stats" aria-label="Undersale inventory totals">{[
+      ['Total products', rows.filter(row => row.isUndersale === true).length],
+      ['Published', rows.filter(row => row.isUndersale === true && row.isPublished === true).length],
+      ['Unpublished', rows.filter(row => row.isUndersale === true && !row.isPublished).length],
+      ['Available', rows.filter(row => row.isUndersale === true && row.isAvailable !== false && Number(row.stockQuantity) > 0).length],
+      ['Out of stock', rows.filter(row => row.isUndersale === true && Number(row.stockQuantity) < 1).length],
+    ].map(([label, total]) => <article key={label}><span>{label}</span><strong>{loading ? '...' : total}</strong></article>)}</div>}
     {error && <div className="admin-alert admin-alert-error" role="alert"><b>{french ? "Action impossible" : "Request failed"}</b><span>{error}</span><button type="button" aria-label="Dismiss" onClick={() => setError("")}><X size={15} /></button></div>}
     <section className="admin-panel admin-resource-panel">
-      <div className="admin-toolbar"><label className="admin-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={french ? "Rechercher…" : "Search records…"} /></label>{resource === "products" && <><label className="admin-filter-label">Category<select className="select-control" value={productCategoryFilter} onChange={(event) => setProductCategoryFilter(event.target.value)}><option value="all">All categories</option>{categoryOptions.map((category) => <option key={idOf(category)} value={idOf(category)}>{String(category.nameEn ?? byPath(category, "name.en") ?? category.name ?? idOf(category))}</option>)}</select></label><label className="admin-filter-label">Condition<select className="select-control" value={productConditionFilter} onChange={(event) => setProductConditionFilter(event.target.value)}><option value="all">All</option><option value="new">New</option><option value="used">Used</option></select></label></>}<label className="admin-filter-label">{french ? "Statut" : "Status"}<select className="select-control" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{french ? "Tous" : "All statuses"}</option>{["pending", "open", "unread", "handled", "approved", "hidden", "active", "inactive", "paid", "verified", "rejected"].map((value) => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}</select></label><span className="admin-record-count">{loading ? "…" : `${visibleRows.length} ${french ? "éléments" : "records"}`}</span></div>
+      <div className="admin-toolbar"><label className="admin-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={french ? "Rechercher…" : "Search records…"} /></label>{resource === "products" && <><label className="admin-filter-label">Category<select className="select-control" value={productCategoryFilter} onChange={(event) => setProductCategoryFilter(event.target.value)}><option value="all">All categories</option>{categoryOptions.map((category) => <option key={idOf(category)} value={idOf(category)}>{String(category.nameEn ?? byPath(category, "name.en") ?? category.name ?? idOf(category))}</option>)}</select></label><label className="admin-filter-label">Condition<select className="select-control" value={productConditionFilter} onChange={(event) => setProductConditionFilter(event.target.value)}><option value="all">All</option><option value="new">New</option><option value="used">Used</option><option value="refurbished">Refurbished</option></select></label></>}<label className="admin-filter-label">{french ? "Statut" : "Status"}<select className="select-control" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{french ? "Tous" : "All statuses"}</option>{["published", "draft", "pending", "open", "unread", "handled", "approved", "hidden", "active", "inactive", "paid", "verified", "rejected"].map((value) => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}</select></label><span className="admin-record-count">{loading ? "…" : `${visibleRows.length} ${french ? "éléments" : "records"}`}</span></div>
       {loading ? <div className="admin-loading"><LoaderCircle className="admin-spin" size={20} />{french ? "Chargement des données…" : "Loading records from API…"}</div> : error && rows.length === 0 ? <div className="admin-empty"><ShieldCheck size={24} /><b>{french ? "Connexion au serveur requise" : "Backend connection required"}</b><p>{error}</p><small>{french ? "Aucun enregistrement local n’a été présenté comme sauvegardé." : "No local records are shown as if they were saved."}</small></div> : visibleRows.length === 0 ? <div className="admin-empty"><FilePlus2 size={24} /><b>{french ? "Aucun résultat" : "No records found"}</b><p>{french ? "Ajustez votre recherche ou créez un élément." : "Change the search or add the first record."}</p></div> : <div className="admin-table-wrap"><table className="admin-table admin-wide-table"><thead><tr>{conf.columns.map((column) => <th key={column.key}>{column.label}</th>)}<th className="admin-actions-head">Actions</th></tr></thead><tbody>{visibleRows.map((item, index) => <tr key={idOf(item) || index}>{conf.columns.map((column) => <td key={column.key}>{column.key === "status" || column.key === "paymentStatus" || column.key === "isActive" ? <span className={`admin-status-pill ${(String(columnValue(item, column.key) ?? (item.isActive ? "active" : "inactive"))).toLowerCase().replace(/[^a-z]+/g, "-")}`}>{displayValue(columnValue(item, column.key) ?? (column.key === "isActive" ? item.isActive : undefined), column.key)}</span> : <span className={column.key === "message" || column.key === "experience" ? "admin-cell-truncate" : ""} title={String(columnValue(item, column.key) ?? "")}>{displayValue(columnValue(item, column.key), column.key)}</span>}</td>)}<td><div className="admin-row-actions">
         {(resource === "products" || resource === "categories" || resource === "quotations" || resource === "bookings" || resource === "messages" || resource === "reviews" || resource === "settings") && <button className="admin-icon-action" title="Edit" aria-label={`Edit ${idOf(item)}`} onClick={() => openEditor(item)}><Pencil size={14} /></button>}
         {(resource === "orders" || resource === "payments") && String(resource === "payments" ? byPath(item, "payment.status") : item.paymentStatus).toUpperCase() !== "VERIFIED" && <button className="admin-small-action" onClick={() => void verifyPayment(item)}><ShieldCheck size={13} />{french ? "Vérifier" : "Verify payment"}</button>}
@@ -437,6 +474,7 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
         {resource === "bookings" && <><button className="admin-small-action" onClick={() => void updateStatus(item, "APPROVED")}>Approve</button><button className="admin-small-action" onClick={() => { openEditor(item); setValues((current) => ({ ...current, status: "RESCHEDULED" })); }}>Reschedule</button><button className="admin-small-action danger" onClick={() => void updateStatus(item, "REJECTED")}>Reject</button></>}
         {resource === "messages" && <><a className="admin-icon-action admin-whatsapp-action" href={waHref(customerPhone(item), `Hello ${String(item.name ?? byPath(item, "customer.name") ?? "").trim()}, BMTECH is following up on your message.`)} target="_blank" rel="noreferrer" title="Open WhatsApp chat" aria-label="Open WhatsApp chat"><MessageCircle size={14} /></a><button className="admin-small-action" onClick={() => void updateStatus(item, "HANDLED")}>Mark handled</button><button className="admin-icon-action" title="Read message" aria-label="Read message" onClick={() => openEditor(item)}><Eye size={14} /></button></>}
         {resource === "reviews" && <><button className="admin-small-action" onClick={() => void updateStatus(item, "APPROVED")}>Approve</button><button className="admin-small-action" onClick={() => void updateStatus(item, "HIDDEN")}>Hide</button><button className="admin-icon-action danger" title="Remove review" aria-label="Remove review" onClick={() => setConfirm({ title: "Remove customer review?", message: "This permanently deletes the review through the API.", action: () => deleteItem(item) })}><Trash2 size={14} /></button></>}
+        {resource === "products" && <button className="admin-small-action" onClick={() => void updateStatus(item, item.isPublished ? "DRAFT" : "PUBLISHED")}>{item.isPublished ? "Unpublish" : "Publish"}</button>}
         {resource === "products" && <button className="admin-icon-action danger" title="Delete product" aria-label="Delete product" onClick={() => setConfirm({ title: "Delete this product?", message: "This permanently removes the product from the catalogue.", action: () => deleteItem(item) })}><Trash2 size={14} /></button>}
         {resource === "orders" && <><button className="admin-icon-action" title="Review order" aria-label={`Review order ${String(item.reference ?? idOf(item))}`} onClick={() => openEditor(item)}><Eye size={14} /></button>{String(item.status).toUpperCase() === "PENDING" && <button className="admin-small-action" onClick={() => void updateStatus(item, "CONFIRMED")}><Check size={13} />Confirm order</button>}</>}
         {resource === "categories" && <button className="admin-icon-action danger" title="Delete category" aria-label="Delete category" onClick={() => setConfirm({ title: "Delete this category?", message: "Products may rely on this category. The server will reject deletion if it is still in use.", action: () => deleteItem(item) })}><Trash2 size={14} /></button>}
@@ -446,11 +484,11 @@ export function AdminResourcePage({ resource }: { resource: ResourceKey }) {
         </div></td></tr>)}</tbody></table></div>}
     </section>
 
-    {editing && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor(); }}><section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-editor-title"><header><div><span className="admin-eyebrow">{resource.toUpperCase()}</span><h2 id="admin-editor-title">{resource === "orders" ? (french ? "Détails de la commande" : "Order details") : resource === "payments" ? (french ? "Détails du paiement" : "Payment details") : conf.fields.length === 0 ? "Record details" : idOf(editing) ? "Edit record" : "Add new record"}</h2></div><button type="button" className="admin-icon-action" onClick={closeEditor} aria-label="Close editor"><X size={18} /></button></header>
+    {editing && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (!saving && event.target === event.currentTarget) closeEditor(); }}><section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-editor-title"><header><div><span className="admin-eyebrow">{resource.toUpperCase()}</span><h2 id="admin-editor-title">{resource === "orders" ? (french ? "Détails de la commande" : "Order details") : resource === "payments" ? (french ? "Détails du paiement" : "Payment details") : conf.fields.length === 0 ? "Record details" : idOf(editing) ? "Edit record" : "Add new record"}</h2></div><button type="button" className="admin-icon-action" onClick={closeEditor} disabled={saving} aria-label="Close editor"><X size={18} /></button></header>
       {(resource === "messages" || resource === "quotations" || resource === "bookings") && <section className="admin-request-preview"><h3>{resource === "messages" ? "Customer message" : resource === "quotations" ? "Quotation request details" : "Booking request details"}</h3><div><b>{String(byPath(editing, "customer.name") ?? editing.name ?? "Customer")}</b><span>{String(customerPhone(editing) || "Phone not supplied")}</span>{Boolean(editing.email ?? byPath(editing, "customer.email")) && <span>{String(editing.email ?? byPath(editing, "customer.email"))}</span>}</div><p>{String(editing.message ?? editing.details ?? editing.requirements ?? "No additional details provided.")}</p>{Boolean(editing.selection ?? editing.service ?? editing.serviceType) && <small>{String(editing.selection ?? editing.service ?? editing.serviceType)}</small>}</section>}
-      {resource === "orders" ? <OrderDetails item={editing} french={french} /> : resource === "payments" ? <PaymentDetails item={editing} french={french} /> : conf.fields.length === 0 ? <div className="admin-record-details">{Object.entries(editing).filter(([key]) => !["__v"].includes(key)).map(([key, value]) => <div key={key}><b>{key}</b><pre>{typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "—")}</pre></div>)}</div> : <form onSubmit={save}><div className="admin-form-grid">{conf.fields.map((field) => <label key={field.key} className={`admin-form-field ${field.wide ? "wide" : ""} ${field.type === "checkbox" ? "checkbox-field" : ""}`}><span>{field.label}{field.required && <i> *</i>}</span>{field.key === "categoryId" ? <select value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}><option value="">Select a category</option>{categoryOptions.map((category) => <option key={idOf(category)} value={idOf(category)}>{String(category.nameEn ?? byPath(category, "name.en") ?? category.name ?? idOf(category))}</option>)}</select> : field.type === "textarea" ? <textarea rows={4} required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} /> : field.type === "select" ? <select required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}>{(field.options ?? []).map((option) => <option value={option} key={option}>{option}</option>)}</select> : field.type === "checkbox" ? <input type="checkbox" checked={values[field.key] === true} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.checked }))} /> : <input type={field.type ?? "text"} required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} />}</label>)}</div>
-        {resource === "products" && <section className="admin-image-manager"><div className="admin-image-manager-heading"><div><h3>Product photos</h3><p>Upload multiple images, drag order with the arrows, choose the cover and remove unwanted photos.</p></div><label className="button button-outline admin-upload-button"><ImagePlus size={15} />Add photos<input type="file" accept="image/*" multiple onChange={addImages} /></label></div>{images.length === 0 ? <div className="admin-image-empty"><ImagePlus size={19} />No product photos added yet.</div> : <div className="admin-image-grid">{images.map((image, index) => <div className={`admin-image-tile ${index === 0 ? "is-cover" : ""}`} key={image.key}><img src={image.src} alt={image.alt} /><span className="admin-image-index">{index === 0 ? "COVER" : `PHOTO ${index + 1}`}</span><div className="admin-image-actions"><button type="button" disabled={index === 0} aria-label="Move image earlier" onClick={() => moveImage(index, -1)}><ChevronLeft size={14} /></button><button type="button" disabled={index === images.length - 1} aria-label="Move image later" onClick={() => moveImage(index, 1)}><ChevronRight size={14} /></button><button type="button" title="Make cover image" aria-label="Make cover image" disabled={index === 0} onClick={() => moveImage(index, -index)}><Check size={14} /></button><button type="button" className="remove" aria-label="Remove image" onClick={() => { if (image.file) URL.revokeObjectURL(image.src); setImages((current) => current.filter((entry) => entry.key !== image.key)); }}><X size={14} /></button></div></div>)}</div>}</section>}
-        {error && <div className="admin-alert admin-alert-error" role="alert">{error}</div>}<footer className="admin-modal-footer"><button type="button" className="button button-outline" onClick={closeEditor}>{french ? "Annuler" : "Cancel"}</button><button type="submit" className="button button-primary" disabled={saving}>{saving ? <><LoaderCircle className="admin-spin" size={15} />{french ? "Enregistrement…" : "Saving…"}</> : <><Check size={15} />{french ? "Enregistrer" : "Save changes"}</>}</button></footer></form>}
+      {resource === "orders" ? <OrderDetails item={editing} french={french} /> : resource === "payments" ? <PaymentDetails item={editing} french={french} /> : conf.fields.length === 0 ? <div className="admin-record-details">{Object.entries(editing).filter(([key]) => !["__v"].includes(key)).map(([key, value]) => <div key={key}><b>{key}</b><pre>{typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "—")}</pre></div>)}</div> : <form onSubmit={save} aria-busy={saving}><fieldset className="admin-product-fieldset" disabled={saving}><div className="admin-form-grid">{editorFields.map((field) => <label key={field.key} className={`admin-form-field ${field.wide ? "wide" : ""} ${field.type === "checkbox" ? "checkbox-field" : ""}`}><span>{field.label}{field.required && <i> *</i>}</span>{field.key === "categoryId" ? <select value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}><option value="">Select a category</option>{categoryOptions.map((category) => <option key={idOf(category)} value={idOf(category)}>{String(category.nameEn ?? byPath(category, "name.en") ?? category.name ?? idOf(category))}</option>)}</select> : field.type === "textarea" ? <textarea rows={4} required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} /> : field.type === "select" ? <select required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}>{(field.options ?? []).map((option) => <option value={option} key={option}>{option}</option>)}</select> : field.type === "checkbox" ? <input type="checkbox" checked={values[field.key] === true} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.checked }))} /> : <input type={field.type ?? "text"} min={field.type === "number" ? 0 : undefined} step={field.key === "price" ? "0.01" : field.type === "number" ? "1" : undefined} required={field.required} value={String(values[field.key] ?? "")} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} />}</label>)}</div>
+        {resource === "products" && <section className="admin-image-manager"><div className="admin-image-manager-heading"><div><h3>Product photos</h3><p>Upload multiple images, drag order with the arrows, choose the cover and remove unwanted photos.</p></div><label className="button button-outline admin-upload-button"><ImagePlus size={15} />Add photos<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple onChange={addImages} /></label></div>{images.length === 0 ? <div className="admin-image-empty"><ImagePlus size={19} />No product photos added yet.</div> : <div className="admin-image-grid">{images.map((image, index) => <div className={`admin-image-tile ${index === 0 ? "is-cover" : ""}`} key={image.key}><img src={image.src} alt={image.alt} /><label className="admin-replace-photo">Replace<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={event => { const file = event.target.files?.[0]; if (!file) return; if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) || file.size > 4000000) { setError("Select a JPEG, PNG, WebP or GIF photo up to 4 MB."); return; } if (image.file) URL.revokeObjectURL(image.src); setImages(current => current.map(entry => entry.key === image.key ? { key: `new-${crypto.randomUUID()}`, file, src: URL.createObjectURL(file), alt: file.name } : entry)); }}/></label><span className="admin-image-index">{index === 0 ? "COVER" : `PHOTO ${index + 1}`}</span><div className="admin-image-actions"><button type="button" disabled={index === 0} aria-label="Move image earlier" onClick={() => moveImage(index, -1)}><ChevronLeft size={14} /></button><button type="button" disabled={index === images.length - 1} aria-label="Move image later" onClick={() => moveImage(index, 1)}><ChevronRight size={14} /></button><button type="button" title="Make cover image" aria-label="Make cover image" disabled={index === 0} onClick={() => moveImage(index, -index)}><Check size={14} /></button><button type="button" className="remove" aria-label="Remove image" onClick={() => setConfirm({ title: "Remove this photo?", message: "The photo will be removed when you save the product. You can cancel the editor to keep it.", action: async () => { if (image.file) URL.revokeObjectURL(image.src); setImages(current => current.filter(entry => entry.key !== image.key)); } })}><X size={14} /></button></div></div>)}</div>}</section>}
+        {error && <div className="admin-alert admin-alert-error" role="alert">{error}</div>}<footer className="admin-modal-footer"><button type="button" className="button button-outline" disabled={saving} onClick={closeEditor}>{french ? "Annuler" : "Cancel"}</button><button type="submit" className="button button-primary" disabled={saving}>{saving ? <><LoaderCircle className="admin-spin" size={15} />{french ? "Enregistrement…" : "Saving…"}</> : <><Check size={15} />{french ? "Enregistrer" : undersale && values.isPublished ? "Publish product" : "Save changes"}</>}</button></footer></fieldset></form>}
     </section></div>}
 
     {confirm && <div className="admin-modal-backdrop" role="presentation"><section className="admin-confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"><span className="admin-confirm-icon"><Trash2 size={18} /></span><h2 id="confirm-title">{confirm.title}</h2><p>{confirm.message}</p><div className="admin-modal-footer"><button type="button" className="button button-outline" onClick={() => setConfirm(null)}>Cancel</button><button type="button" className="button admin-danger-button" onClick={async () => { const current = confirm; setConfirm(null); await current.action(); }}>Delete permanently</button></div></section></div>}

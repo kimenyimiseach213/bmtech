@@ -29,6 +29,7 @@
     }
   },
   "include": [
+    ".next-security-check/types/**/*.ts",
     ".next/preview/types/**/*.ts",
     ".next/types/**/*.ts",
     "app/**/*.ts",
@@ -39,7 +40,7 @@
     "middleware.ts",
     "next-env.d.ts",
     "types/**/*.ts",
-    ".next-security-check/types/**/*.ts"
+    ".next-undersale-preview/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

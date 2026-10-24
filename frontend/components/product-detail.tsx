@@ -7,6 +7,8 @@ import type { Product } from "@/types";
 import { Breadcrumbs, PriceDisplay, SectionHeading, StatusBadge } from "@/components/ui";
 import { ProductGrid } from "@/components/products";
 import { useStore } from "@/app/providers";
+import { ProductPhoto } from "@/components/product-photo";
+import { OrderNow } from "@/components/order-now";
 import { whatsappLink } from "@/lib/data";
 
 export function ProductDetail({ product, related }: { product: Product; related: Product[] }) {
@@ -16,10 +18,10 @@ export function ProductDetail({ product, related }: { product: Product; related:
   const images = product.images?.length ? product.images : [{ src: product.image, alt: `${name}, illustrative product image` }];
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [zoom, setZoom] = useState(1.12);
+  const [zoom, setZoom] = useState(1);
   const activeImage = images[selectedIndex] ?? images[0];
   const [quantity, setQuantity] = useState(1);
-  const canBuy = product.price !== null && product.stock > 0;
+  const canBuy = product.price !== null && product.stock > 0 && product.isAvailable !== false;
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) setIsPlaying(false);
@@ -48,10 +50,11 @@ export function ProductDetail({ product, related }: { product: Product; related:
   return (
     <main className="container page-content">
       <Breadcrumbs items={[{ label: "Products", href: "/products" }, { label: name }]} />
+      <Link href={product.isUndersale ? "/undersale" : "/products"} className="text-link back-to-products">&larr; Back to products</Link>
       <div className="product-detail-grid">
         <section>
           <div className="product-gallery-main">
-            <img key={activeImage.src} className="product-gallery-photo" src={activeImage.src} alt={activeImage.alt} style={{ transform: `scale(${zoom})` }} />
+            <div className="product-gallery-photo" style={{ transform: `scale(${zoom})`, position: "absolute", inset: 0 }}><ProductPhoto src={activeImage.src} alt={activeImage.alt} sizes="(max-width: 780px) 92vw, 50vw" priority/></div>
             {images.length > 1 && <>
               <button className="gallery-arrow gallery-arrow-prev" type="button" onClick={() => selectImage(selectedIndex - 1)} aria-label="Show previous product photo"><ChevronLeft size={20} /></button>
               <button className="gallery-arrow gallery-arrow-next" type="button" onClick={() => selectImage(selectedIndex + 1)} aria-label="Show next product photo"><ChevronRight size={20} /></button>
@@ -85,21 +88,24 @@ export function ProductDetail({ product, related }: { product: Product; related:
           <h1>{name}</h1>
           <div className="product-detail-meta">
             {product.sku && <span>SKU: {product.sku}</span>}
+            {product.brand && <span>{product.brand}</span>}
             {product.model && <span>{product.model}</span>}
             {product.condition && <span>{product.condition}</span>}
           </div>
-          <p>{description}</p>
+          {product.shortDescription && <p>{product.shortDescription}</p>}
+          <p style={{ whiteSpace: "pre-wrap" }}>{description}</p>
           <div className="detail-price-box">
             <PriceDisplay amount={product.price} />
             <div className="demo-price-note">{product.demo ? "Preview price only · confirm with BMTECH" : product.price ? "Confirm the current price with BMTECH" : "Price depends on the selected model; confirm with BMTECH"}</div>
           </div>
           <div className="detail-availability">
             <Check size={14} />
-            {product.stock > 0 ? product.availability : "Availability to be confirmed"} · {product.demo ? "stock shown is demo data" : "confirm current stock with BMTECH"}
+            {product.stock < 1 ? "Out of Stock" : product.isAvailable === false ? "Unavailable" : product.availability} · {product.demo ? "stock shown is demo data" : "confirm current stock with BMTECH"}
           </div>
           <div className="detail-actions" style={{ marginTop: 17 }}>
-            {canBuy && <div className="quantity-control"><button onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label="Decrease quantity"><Minus size={13} /></button><span>{quantity}</span><button onClick={() => setQuantity(quantity + 1)} aria-label="Increase quantity"><Plus size={13} /></button></div>}
-            {canBuy && <button className="button button-primary" onClick={() => { add(product.slug, quantity); notify("Added to cart"); }}><ShoppingCart size={15} />Add to Cart</button>}
+            {canBuy && <div className="quantity-control"><button onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label="Decrease quantity"><Minus size={13} /></button><span>{quantity}</span><button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} aria-label="Increase quantity"><Plus size={13} /></button></div>}
+            {product.isUndersale && <OrderNow product={product} quantity={quantity}/>}
+            {(canBuy || product.isUndersale) && <button disabled={!canBuy} className="button button-primary" onClick={() => { add(product.slug, quantity); notify("Added to cart"); }}><ShoppingCart size={15} />Add to Cart</button>}
             <Link href={`/quote?item=${encodeURIComponent(name)}`} className={`button ${canBuy ? "button-outline" : "button-primary"}`}>Request a Quote<ArrowRight size={14} /></Link>
           </div>
           <a className="whatsapp-inline" href={whatsappLink(`Hello BMTECH, I would like to ask about ${name}${product.sku ? ` (${product.sku})` : ""}.`, company.whatsapp)} target="_blank" rel="noreferrer"><MessageCircle size={15} />Ask on WhatsApp</a>
